@@ -216,6 +216,12 @@ Lean: 90 days for money events, 14 for access.
 Needed before a real tenant with real captures. Lean: draft from templates, publish
 the subprocessor list, no entity gymnastics before revenue.
 
+### OPEN-OPS-03 — GitHub Pro, or make the repo public, to get branch protection? (blocks 1)
+
+Private repos on the free plan have no branch protection or rulesets, so `main` is
+guarded only by the local pre-push hook. Lean: pay for Pro; public is not viable
+while the schema and docs describe the product.
+
 ### OPEN-ARCH-01 — VPS region? (blocks 7)
 
 Controls data-plane→control latency for vault calls only; renders are at the edge.

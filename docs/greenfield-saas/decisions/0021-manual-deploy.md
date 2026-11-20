@@ -22,8 +22,10 @@ Deployment is `scripts/deploy.mjs <unit> <env>`, one unit at a time, staging
 before production. The script prints its plan, runs the gate, and refuses to
 continue on a red tree.
 
-Branch protection on `main` stays on (review + linear history) even though CI is
-not a required check; the hook is the enforcement.
+Branch protection on `main` was attempted and is refused on a private repo without
+GitHub Pro (403 from both the protection and ruleset APIs). Until that is bought,
+the hook is the only enforcement and `main` can be force-pushed by someone who
+skips it. Recorded as `OPEN-OPS-03`.
 
 ## Consequences
 
