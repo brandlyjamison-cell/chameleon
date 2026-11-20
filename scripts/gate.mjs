@@ -6,6 +6,7 @@
  * Full runs every check. Fast is what a commit pays for.
  */
 import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 
 for (const file of [".env", ".env.db"]) {
   try {
@@ -16,10 +17,13 @@ for (const file of [".env", ".env.db"]) {
 }
 
 const isWindows = process.platform === "win32";
-const bin = (name) => (isWindows ? `${name}.cmd` : name);
+const binDir = resolve("node_modules", ".bin");
+const bin = (name) => (isWindows ? `${binDir}\\${name}.cmd` : `${binDir}/${name}`);
 
 const full = process.argv.includes("--full");
 const fast = !full;
+
+const hasDb = Boolean(process.env.DATABASE_URL_TEST);
 
 const steps = [
   ["secrets", "node", ["scripts/check-secrets.mjs"], true],
@@ -27,8 +31,19 @@ const steps = [
   ["lint", bin("eslint"), ["."], true],
   ["boundaries", "node", ["scripts/check-boundaries.mjs"], false],
   ["no-client-resolution", "node", ["scripts/check-no-client-resolution.mjs"], false],
-  ["migrate", "node", ["packages/db/scripts/migrate.mjs"], false],
-  ["rls", "node", ["packages/db/scripts/assert-rls.mjs"], false],
+  ...(hasDb
+    ? [
+        ["migrate", "node", ["packages/db/scripts/migrate.mjs"], false],
+        ["rls", "node", ["packages/db/scripts/assert-rls.mjs"], false],
+      ]
+    : [
+        [
+          "db",
+          "node",
+          ["-e", 'console.log("no DATABASE_URL_TEST, db steps skipped")'],
+          true,
+        ],
+      ]),
   ["typecheck", bin("tsc"), ["-p", "tsconfig.json"], true],
   ["test", bin("vitest"), ["run"], false],
 ];
