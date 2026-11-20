@@ -143,7 +143,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["scripts/**/*.mjs", "**/*.config.{js,mjs,ts,cjs}"],
+    files: ["**/scripts/**/*.mjs", "scripts/**/*.mjs", "**/*.config.{js,mjs,ts,cjs}"],
     languageOptions: { globals: globals.node },
     rules: { "no-console": "off", "@typescript-eslint/no-explicit-any": "off" },
   },

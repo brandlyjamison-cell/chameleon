@@ -32,9 +32,9 @@ Acceptance:
 4. Zod schemas for `LinkResolve`, `EngineCapture`, `CaptureRow` compile and have
    tests that reject a client-supplied `kind`.
 5. A fresh clone reaches green in one `pnpm i && pnpm run ci` on Windows and Linux.
-6. Pre-push hook installed by `pnpm install` is the enforcement (ADR 0021 — no CI
-   pipeline). Branch protection is unavailable on a private repo without GitHub
-   Pro; `OPEN-OPS-03` tracks Pro vs. public.
+6. `main` is protected by a ruleset (no deletion, no force-push, PR required) and
+   the pre-push hook installed by `pnpm install` is the gate (ADR 0021 — no CI
+   pipeline).
 
 Invariants touched: INV-ARCH-01, INV-CAP-03, INV-EDGE-04.
 

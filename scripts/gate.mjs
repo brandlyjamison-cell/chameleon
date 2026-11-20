@@ -7,6 +7,14 @@
  */
 import { spawnSync } from "node:child_process";
 
+for (const file of [".env", ".env.db"]) {
+  try {
+    process.loadEnvFile(file);
+  } catch {
+    // optional
+  }
+}
+
 const isWindows = process.platform === "win32";
 const bin = (name) => (isWindows ? `${name}.cmd` : name);
 
@@ -19,6 +27,8 @@ const steps = [
   ["lint", bin("eslint"), ["."], true],
   ["boundaries", "node", ["scripts/check-boundaries.mjs"], false],
   ["no-client-resolution", "node", ["scripts/check-no-client-resolution.mjs"], false],
+  ["migrate", "node", ["packages/db/scripts/migrate.mjs"], false],
+  ["rls", "node", ["packages/db/scripts/assert-rls.mjs"], false],
   ["typecheck", bin("tsc"), ["-p", "tsconfig.json"], true],
   ["test", bin("vitest"), ["run"], false],
 ];
