@@ -6,11 +6,11 @@ is per service.
 
 ## Gate modes
 
-| Mode | Behaviour | DEK wrapped under |
-| --- | --- | --- |
-| `always` (default) | Passcode on every open. Short session (15 min, memory), re-prompt after. | passcode |
-| `remember_30d` | Passcode once per device, cookie remembers 30 days, revocable per device. | passcode |
-| `off` | Platform login only. | KEK (server-side) |
+| Mode               | Behaviour                                                                 | DEK wrapped under |
+| ------------------ | ------------------------------------------------------------------------- | ----------------- |
+| `always` (default) | Passcode on every open. Short session (15 min, memory), re-prompt after.  | passcode          |
+| `remember_30d`     | Passcode once per device, cookie remembers 30 days, revocable per device. | passcode          |
+| `off`              | Platform login only.                                                      | KEK (server-side) |
 
 The passcode is set when the service activates. It is stored (hashed) even if the
 mode is later set to `off`, so re-arming needs no new passcode. Re-arming
@@ -49,7 +49,7 @@ Semantics that make the modes real:
 ## Vault session
 
 A successful passcode unwraps the DEK into Worker memory for the request and
-stores only a *handle*:
+stores only a _handle_:
 
 - `vault_session` row: `service_id`, `user_id`, `mode`, `expires_at`, `ua`,
   `ip_hash`.
@@ -81,15 +81,15 @@ Columns: `received_at`, `source`, `status`, `kind`, `username`, `password`
 
 ## Owner actions
 
-| Action | Effect | Gate |
-| --- | --- | --- |
-| mark valid / invalid | `status` write, audited in the service activity log | vault session |
-| delete | hard delete of the row + R2 object schedule | vault session |
-| delete all (filter) | batched job, confirm by typing the service name | vault session |
-| export CSV | streamed, current filter, `source` respected | vault session |
-| webhook forward | Pro, per-service endpoint, HMAC signed | vault session + `webhook:write` |
-| re-arm gate | `off → always`, rewrap, drop devices | passcode |
-| rotate passcode | verify old, rewrap, drop devices | passcode |
+| Action               | Effect                                              | Gate                            |
+| -------------------- | --------------------------------------------------- | ------------------------------- |
+| mark valid / invalid | `status` write, audited in the service activity log | vault session                   |
+| delete               | hard delete of the row + R2 object schedule         | vault session                   |
+| delete all (filter)  | batched job, confirm by typing the service name     | vault session                   |
+| export CSV           | streamed, current filter, `source` respected        | vault session                   |
+| webhook forward      | Pro, per-service endpoint, HMAC signed              | vault session + `webhook:write` |
+| re-arm gate          | `off → always`, rewrap, drop devices                | passcode                        |
+| rotate passcode      | verify old, rewrap, drop devices                    | passcode                        |
 
 Deleting a capture is permanent; there is no trash. The cap makes deletion a
 normal operation, so the UI must not treat it as destructive theatre — one click,

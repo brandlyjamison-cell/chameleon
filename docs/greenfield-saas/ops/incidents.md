@@ -2,11 +2,11 @@
 
 ## Severity
 
-| Sev | Definition | Response |
-| --- | --- | --- |
-| S1 | All links down; captures leaking across tenants; money state wrong in a way that grants free service | page immediately, all-hands, status page |
-| S2 | One service or one region degraded; vault unreadable; billing webhooks failing | page on-call, hourly updates |
-| S3 | Single tenant impact; profile generation down; export slow | next business hour, daily update |
+| Sev | Definition                                                                                           | Response                                 |
+| --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| S1  | All links down; captures leaking across tenants; money state wrong in a way that grants free service | page immediately, all-hands, status page |
+| S2  | One service or one region degraded; vault unreadable; billing webhooks failing                       | page on-call, hourly updates             |
+| S3  | Single tenant impact; profile generation down; export slow                                           | next business hour, daily update         |
 
 ## Roles
 

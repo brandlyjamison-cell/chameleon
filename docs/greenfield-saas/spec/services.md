@@ -10,14 +10,14 @@ registry resolves `service_type → engine module`; the service row stores only
 
 ## The two types
 
-| | `chameleon` | `aitm` |
-| --- | --- | --- |
-| Status | ships first | ships later, interface only |
-| Render | static skeleton, server-rendered HTML | reverse proxy of the real IdP, rewritten HTML |
-| Captures | `credential` | `session`, or `mixed` |
-| OTP | never rendered | relayed to the real IdP; the victim can complete it |
-| Redirect | 302 to the real login after submit | 302 to the real app with the session |
-| Cost driver | render + one row | subrequests + R2 payload |
+|             | `chameleon`                           | `aitm`                                              |
+| ----------- | ------------------------------------- | --------------------------------------------------- |
+| Status      | ships first                           | ships later, interface only                         |
+| Render      | static skeleton, server-rendered HTML | reverse proxy of the real IdP, rewritten HTML       |
+| Captures    | `credential`                          | `session`, or `mixed`                               |
+| OTP         | never rendered                        | relayed to the real IdP; the victim can complete it |
+| Redirect    | 302 to the real login after submit    | 302 to the real app with the session                |
+| Cost driver | render + one row                      | subrequests + R2 payload                            |
 
 ## One contract
 
@@ -38,7 +38,7 @@ The route does not decide `kind`. The engine does, from the registry row:
 ```ts
 // packages/engine/types.ts — NORMATIVE
 export interface Engine {
-  readonly code: ServiceTypeCode;          // 'chameleon' | 'aitm'
+  readonly code: ServiceTypeCode; // 'chameleon' | 'aitm'
   readonly captureKinds: readonly CaptureKind[]; // ['credential'] | ['session','mixed']
   readonly defaultKind: CaptureKind;
   resolve(input: ResolveInput): Promise<ResolvedTemplate>;
@@ -76,13 +76,13 @@ an ADR against INV-ARCH-03.
 
 `provisioning → active → past_due → expired → archived`
 
-| Status | Links serve | Writes (links/domains) | Vault read |
-| --- | --- | --- | --- |
-| provisioning | no | yes | no |
-| active | yes | yes | yes |
-| past_due | yes (grace) | yes | yes |
-| expired | no (404) | no | yes (read/export only) |
-| archived | no | no | no |
+| Status       | Links serve | Writes (links/domains) | Vault read             |
+| ------------ | ----------- | ---------------------- | ---------------------- |
+| provisioning | no          | yes                    | no                     |
+| active       | yes         | yes                    | yes                    |
+| past_due     | yes (grace) | yes                    | yes                    |
+| expired      | no (404)    | no                     | yes (read/export only) |
+| archived     | no          | no                     | no                     |
 
 Activation is the moment a service gets its passcode, its DEK, and its
 entitlement flag. Without those three it cannot serve. Provisioning to active is

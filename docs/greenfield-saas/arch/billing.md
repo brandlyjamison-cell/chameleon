@@ -22,9 +22,9 @@ partial payments across coins get messy.
 1. Read `service_id` + `tier_id` from the form; load the tier row.
 2. Sum the org's active services.
 3. Create a `payments` row: `status='pending'`, price snapshot, `period_start =
-   now()`, `period_end = now() + 1 month` (or from current end if renewing).
+now()`, `period_end = now() + 1 month` (or from current end if renewing).
 4. `POST https://api.nowpayments.io/v1/invoice` with `price_amount`, `order_id =
-   payment.id`, `ipn_callback_url`, `success_url`, `cancel_url`.
+payment.id`, `ipn_callback_url`, `success_url`, `cancel_url`.
 5. Store `provider_invoice_id`, return the hosted URL.
 6. Redirect the browser.
 
@@ -56,7 +56,7 @@ not by a read-then-check.
 2. Recompute HMAC-SHA-512 over the sorted-key JSON per NowPayments' scheme with
    the IPN secret; constant-time compare.
 3. `insert into webhook_events (provider, provider_event_id) on conflict do
-   nothing`; if no row returned, ack 200 and stop.
+nothing`; if no row returned, ack 200 and stop.
 4. `GET /v1/payment/<payment_id>` from NowPayments. **Trust the API response, not
    the body** (INV-SEC-05).
 5. Map API status: `finished`/`confirmed` → confirmed; `partially_paid` →
@@ -102,15 +102,15 @@ tier, and combined invoices make partial cancellation a refund problem.
 
 ## Failure handling
 
-| Case | Behaviour |
-| --- | --- |
-| IPN forged | 401, no state change, logged |
-| IPN valid, API contradicts | follow API, log divergence |
-| API unreachable | 500, retry |
-| Double IPN | 200 no-op |
-| Payment for an expired service, arrives late | confirm, reactivate, `expires_at` from now |
-| Payment for a deleted service | confirm, park in admin queue for reassignment |
-| Chargeback/refund after period start | refund recorded, period stands |
+| Case                                         | Behaviour                                     |
+| -------------------------------------------- | --------------------------------------------- |
+| IPN forged                                   | 401, no state change, logged                  |
+| IPN valid, API contradicts                   | follow API, log divergence                    |
+| API unreachable                              | 500, retry                                    |
+| Double IPN                                   | 200 no-op                                     |
+| Payment for an expired service, arrives late | confirm, reactivate, `expires_at` from now    |
+| Payment for a deleted service                | confirm, park in admin queue for reassignment |
+| Chargeback/refund after period start         | refund recorded, period stands                |
 
 ## Alarms
 

@@ -59,7 +59,7 @@ only the founder holds except the KEK rotation.
 
 - Check the cron trigger and last run. Missed run > 10 min → trigger manually.
 - Verify with `select count(*) from services where expires_at <= now() and
-  ent_flag <> 'expired'`; a non-zero count after a manual run means the query or
+ent_flag <> 'expired'`; a non-zero count after a manual run means the query or
   the KV write is broken.
 - While lagging, extend nothing by hand; the flag is the truth and the sweeper is
   the repair.
@@ -107,7 +107,7 @@ only the founder holds except the KEK rotation.
 ## Deploy
 
 ```
-pnpm ci                       # lint, typecheck, tests, isolation, boundaries
+pnpm run ci                       # lint, typecheck, tests, isolation, boundaries
 pnpm deploy:<unit>:staging    # then smoke
 pnpm deploy:<unit>:production # after staging smoke is green
 ```

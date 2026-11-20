@@ -23,14 +23,14 @@ control host, so neither plane ever falls through (INV-EDGE-08).
 All edge state is derived and disposable. A full KV wipe degrades to a rebuild,
 not data loss.
 
-| Key | Value | TTL | Written by |
-| --- | --- | --- | --- |
-| `d:<hostname>` | `{domain_id, service_id, org_id, status, verify_exp}` | 5 min | domain verify job, sweeper |
-| `l:<hostname>:<slug>` | `{link_id, service_id, org_id, pin, token, status}` | 1 h | mint, edit, sweeper |
-| `ent:<service_id>` | `'active' \| 'expired' \| 'past_due'` | 10 min | billing webhook, sweeper |
-| `prof:<sha1(domain)>` | `{profile, assets_prefix, step_count}` | 30 d | profile generator |
-| `brands:v<n>` | full brand map, one blob | 1 h | seed/publish |
-| `neg:<hostname>` | `'1'` for unknown hosts | 60 s | edge on miss |
+| Key                   | Value                                                 | TTL    | Written by                 |
+| --------------------- | ----------------------------------------------------- | ------ | -------------------------- |
+| `d:<hostname>`        | `{domain_id, service_id, org_id, status, verify_exp}` | 5 min  | domain verify job, sweeper |
+| `l:<hostname>:<slug>` | `{link_id, service_id, org_id, pin, token, status}`   | 1 h    | mint, edit, sweeper        |
+| `ent:<service_id>`    | `'active' \| 'expired' \| 'past_due'`                 | 10 min | billing webhook, sweeper   |
+| `prof:<sha1(domain)>` | `{profile, assets_prefix, step_count}`                | 30 d   | profile generator          |
+| `brands:v<n>`         | full brand map, one blob                              | 1 h    | seed/publish               |
+| `neg:<hostname>`      | `'1'` for unknown hosts                               | 60 s   | edge on miss               |
 
 `ent` is checked with `!= 'active'` → 404, so a missing key denies (INV-EDGE-03).
 
@@ -112,7 +112,7 @@ Durable Object `ServiceLimiter`, one instance per service, `idFromName(service_i
 Fixed window of 60s in DO storage, no sliding log, because the point is load
 shedding not fairness. Over the limit: 429 + `retry-after`, same 404 body.
 
-`OPEN-EDGE-03`: does a shared platform host (`go.<p>`) need a *per-tenant* sub
+`OPEN-EDGE-03`: does a shared platform host (`go.<p>`) need a _per-tenant_ sub
 limit on top of per-service, since one noisy tenant on the shared host is
 invisible to per-service counters? Lean: yes, `svc:<id>` bucket as today, plus a
 host bucket.

@@ -33,11 +33,11 @@ page and a `?` param collision. The brief fixes this as a hard constraint; ADR
 
 ## Deployables
 
-| Unit | Runtime | Serves | Scales by |
-| --- | --- | --- | --- |
-| `apps/control` | Node 22 on VPS, behind Caddy, `app.<p>` only | dashboard, auth, admin, public API, demo page, billing checkout | vertical; process count |
-| `apps/edge` | Cloudflare Workers, all data hosts | resolution, render, capture POST, assets, unbranded 404 | Cloudflare |
-| `apps/pipeline` | Workers (queue + cron only) | capture consume, profile crawl, sweeper, webhook fan-out, demo reset, prune janitor | queue depth |
+| Unit            | Runtime                                      | Serves                                                                              | Scales by               |
+| --------------- | -------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------- |
+| `apps/control`  | Node 22 on VPS, behind Caddy, `app.<p>` only | dashboard, auth, admin, public API, demo page, billing checkout                     | vertical; process count |
+| `apps/edge`     | Cloudflare Workers, all data hosts           | resolution, render, capture POST, assets, unbranded 404                             | Cloudflare              |
+| `apps/pipeline` | Workers (queue + cron only)                  | capture consume, profile crawl, sweeper, webhook fan-out, demo reset, prune janitor | queue depth             |
 
 `apps/pipeline` is separate from `apps/edge` so a slow consumer or a crawl
 backlog never occupies the request path, and so the edge bundle stays free of
@@ -46,12 +46,12 @@ captures.
 
 ## Boundary matrix
 
-| From → To | control | edge | pipeline | contracts | skeleton | db | engine | crypto |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| control | — | HTTP only | — | yes | yes (preview) | yes | yes (preview) | yes (vault proxy client) |
-| edge | — | — | via queue | yes | yes | read via pg | yes | yes |
-| pipeline | — | — | — | yes | — | write via pg | yes (consume hooks) | yes |
-| contracts | — | — | — | — | — | — | — | — |
+| From → To | control | edge      | pipeline  | contracts | skeleton      | db           | engine              | crypto                   |
+| --------- | ------- | --------- | --------- | --------- | ------------- | ------------ | ------------------- | ------------------------ |
+| control   | —       | HTTP only | —         | yes       | yes (preview) | yes          | yes (preview)       | yes (vault proxy client) |
+| edge      | —       | —         | via queue | yes       | yes           | read via pg  | yes                 | yes                      |
+| pipeline  | —       | —         | —         | yes       | —             | write via pg | yes (consume hooks) | yes                      |
+| contracts | —       | —         | —         | —         | —             | —            | —                   | —                        |
 
 Rules:
 
@@ -127,13 +127,13 @@ Control responses carry `x-robots-tag: noindex` and a dashboard CSP with
 
 ## Failure behaviour
 
-| Dependency down | Data plane | Control plane |
-| --- | --- | --- |
-| Postgres | serves from KV while flag alive; capture queues and still 302s | 503 with maintenance page, sessions preserved |
-| KV | 404 (deny) | unaffected |
-| R2 | render degrades to text-only logo and no backdrop | exports 503 |
-| Queue | capture POST still 302s, send retried by binding | unaffected |
-| NowPayments | unaffected until expiry sweep | checkout shows retry |
+| Dependency down | Data plane                                                     | Control plane                                 |
+| --------------- | -------------------------------------------------------------- | --------------------------------------------- |
+| Postgres        | serves from KV while flag alive; capture queues and still 302s | 503 with maintenance page, sessions preserved |
+| KV              | 404 (deny)                                                     | unaffected                                    |
+| R2              | render degrades to text-only logo and no backdrop              | exports 503                                   |
+| Queue           | capture POST still 302s, send retried by binding               | unaffected                                    |
+| NowPayments     | unaffected until expiry sweep                                  | checkout shows retry                          |
 
 The data plane must stay correct with only KV. That is why the KV doc carries
 everything needed to render except the template body.

@@ -10,6 +10,9 @@ exist; if code and docs disagree, docs win until an ADR says otherwise.
 Status: **planning. No code.** Stage 1 of `plan/stages.md` starts on review
 sign-off.
 
+Where a doc says "CI", read the local gate (`pnpm run ci`, ADR 0021). There is no
+GitHub Actions pipeline; the gate is a hook and a script.
+
 ## What this is
 
 A multi-tenant SaaS for spam and affiliate operators. A tenant buys a service,

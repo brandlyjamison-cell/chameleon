@@ -17,19 +17,19 @@ joined to its consumed row.
 
 ## Events that matter
 
-| Event | Fields | Use |
-| --- | --- | --- |
-| `render.ok` | tpl_source (pin/map/profile/cpanel), render_ms | resolution mix |
-| `render.deny` | reason (host/status/ent/token/limit) | why links die |
-| `capture.accepted` | kind, source, seal_ms, queue_ms | yield, latency |
-| `capture.consumed` | capture_id, dup, prune_n | pipeline health |
-| `capture.dead` | capture_id, error class | loss |
-| `vault.open` | service_id, mode, derive_ms | gate health, cost |
-| `vault.denied` | reason | support |
-| `domain.verify` | result, attempt | rotation health |
-| `profile.gen` | domain, ok, step_count, ms | template coverage |
-| `billing.ipn` | payment_id, provider_status, divergence | money truth |
-| `ent.flip` | from, to, cause (webhook/sweeper) | expiry proof |
+| Event              | Fields                                         | Use               |
+| ------------------ | ---------------------------------------------- | ----------------- |
+| `render.ok`        | tpl_source (pin/map/profile/cpanel), render_ms | resolution mix    |
+| `render.deny`      | reason (host/status/ent/token/limit)           | why links die     |
+| `capture.accepted` | kind, source, seal_ms, queue_ms                | yield, latency    |
+| `capture.consumed` | capture_id, dup, prune_n                       | pipeline health   |
+| `capture.dead`     | capture_id, error class                        | loss              |
+| `vault.open`       | service_id, mode, derive_ms                    | gate health, cost |
+| `vault.denied`     | reason                                         | support           |
+| `domain.verify`    | result, attempt                                | rotation health   |
+| `profile.gen`      | domain, ok, step_count, ms                     | template coverage |
+| `billing.ipn`      | payment_id, provider_status, divergence        | money truth       |
+| `ent.flip`         | from, to, cause (webhook/sweeper)              | expiry proof      |
 
 ## Dashboard panels
 
@@ -45,18 +45,18 @@ joined to its consumed row.
 
 Every alert names a runbook anchor and a rotation (INV-OPS-04).
 
-| Severity | Condition | Runbook |
-| --- | --- | --- |
-| P1 page | 5xx > 2% over 10 min on edge | RB-01 |
-| P1 page | queue depth > 5k for 5 min, or dead letters > 100/h | RB-02 |
-| P1 page | confirmed payment not extended within 60 s | RB-03 |
-| P1 page | any 404 body drift (snapshot mismatch) | RB-04 |
-| P2 | sweeper lag > 7 min | RB-05 |
-| P2 | domain verify success < 60% over 1 h | RB-06 |
-| P2 | IPN 5xx > 1% 10 min | RB-03 |
-| P2 | vault derive p95 > 800 ms | RB-07 |
-| P3 | profile success < 50% 6 h | RB-08 |
-| P3 | Sentry new-issue spike | RB-09 |
+| Severity | Condition                                           | Runbook |
+| -------- | --------------------------------------------------- | ------- |
+| P1 page  | 5xx > 2% over 10 min on edge                        | RB-01   |
+| P1 page  | queue depth > 5k for 5 min, or dead letters > 100/h | RB-02   |
+| P1 page  | confirmed payment not extended within 60 s          | RB-03   |
+| P1 page  | any 404 body drift (snapshot mismatch)              | RB-04   |
+| P2       | sweeper lag > 7 min                                 | RB-05   |
+| P2       | domain verify success < 60% over 1 h                | RB-06   |
+| P2       | IPN 5xx > 1% 10 min                                 | RB-03   |
+| P2       | vault derive p95 > 800 ms                           | RB-07   |
+| P3       | profile success < 50% 6 h                           | RB-08   |
+| P3       | Sentry new-issue spike                              | RB-09   |
 
 No alert on render latency alone; a slow render is visible and not paging.
 

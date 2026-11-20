@@ -2,7 +2,7 @@
 
 Ten stages. Each has a goal, a dependency, and acceptance criteria that a second
 person can run. A stage is not done until every criterion passes on staging and
-`pnpm ci` is green.
+`pnpm run ci` is green.
 
 No stage may "temporarily" skip an invariant it touches. If a criterion is
 impossible yet, it is written as a manual check and named here, not dropped.
@@ -25,14 +25,15 @@ Out: any runtime behaviour, any binding, any UI.
 
 Acceptance:
 
-1. `pnpm ci` runs on a PR and fails on a deliberate `import 'next/server'` from
-   `apps/edge`.
+1. `pnpm run ci` runs the local gate and fails on a deliberate `import 'next/server'`
+   from `apps/edge`.
 2. The 404 snapshot test asserts the exact 65 bytes and the five-header allow-list.
 3. `pnpm check:no-client-resolution` exists and passes trivially.
 4. Zod schemas for `LinkResolve`, `EngineCapture`, `CaptureRow` compile and have
    tests that reject a client-supplied `kind`.
-5. A fresh clone reaches green in one `pnpm i && pnpm ci` on Windows and Linux.
-6. Branch protection on `main`: 1 review, CI required, linear history.
+5. A fresh clone reaches green in one `pnpm i && pnpm run ci` on Windows and Linux.
+6. Branch protection on `main`: 1 review, linear history, and the pre-push hook
+   installed by `pnpm install` (ADR 0021 — no CI pipeline).
 
 Invariants touched: INV-ARCH-01, INV-CAP-03, INV-EDGE-04.
 
@@ -121,8 +122,7 @@ Invariants: INV-SEC-06/07, INV-DATA-04/05, INV-EDGE-07.
 
 ## Stage 5 — Links, tokens, resolution, 404
 
-Goal: a verified host serves a real link end to end, and a dead one serves the bare
-404.
+Goal: a verified host serves a real link end to end, and a dead one serves the bare 404.
 
 Depends: 4.
 
@@ -280,7 +280,7 @@ Invariants: INV-OPS-01/03/04, INV-SEC-01, INV-DEMO-*, all P0 at once.
 ## Stage exit checklist (all stages)
 
 - [ ] criteria pass on staging
-- [ ] `pnpm ci` green
+- [ ] `pnpm run ci` green
 - [ ] invariants touched have a check
 - [ ] docs updated, no stale claim
 - [ ] `OPEN:` items added or closed

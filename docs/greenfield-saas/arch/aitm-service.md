@@ -10,19 +10,19 @@ and we capture the resulting session cookie instead of a password.
 
 ## What is already reserved for it
 
-| Today's decision | Why it is aitm-ready |
-| --- | --- |
-| `captures.kind ∈ {credential, session, mixed}` | session rows exist before the engine does |
-| `captures.fields jsonb` envelope, no `password` column | session payloads are not passwords |
-| `payload_ref` + R2, 5-50KB rule | the session blob has a home |
-| `source`, `status` on captures | same triage applies to sessions |
-| `?email=` + `POST /c/:token` + 302 | identical URL and response shape |
-| engine registry, `kind` from the engine | chameleon is hard-coded nowhere |
-| service-scoped DEK, gate, vault | per-service key and gate already exist |
-| `service_types.engine_module` | adding the type is a row plus a module |
-| unbranded 404, KV resolution, slot counters | inherited unchanged |
+| Today's decision                                       | Why it is aitm-ready                      |
+| ------------------------------------------------------ | ----------------------------------------- |
+| `captures.kind ∈ {credential, session, mixed}`         | session rows exist before the engine does |
+| `captures.fields jsonb` envelope, no `password` column | session payloads are not passwords        |
+| `payload_ref` + R2, 5-50KB rule                        | the session blob has a home               |
+| `source`, `status` on captures                         | same triage applies to sessions           |
+| `?email=` + `POST /c/:token` + 302                     | identical URL and response shape          |
+| engine registry, `kind` from the engine                | chameleon is hard-coded nowhere           |
+| service-scoped DEK, gate, vault                        | per-service key and gate already exist    |
+| `service_types.engine_module`                          | adding the type is a row plus a module    |
+| unbranded 404, KV resolution, slot counters            | inherited unchanged                       |
 
-`mixed` exists for the case where an IdP asks for the password and *then* an OTP:
+`mixed` exists for the case where an IdP asks for the password and _then_ an OTP:
 we may capture a password at step N and a session at step N+2. One capture row can
 be `mixed` with a credential part inline and the session in R2. It is reserved
 now and unused by chameleon, which never writes `session` or `mixed`

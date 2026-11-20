@@ -5,15 +5,15 @@ platform availability.
 
 ## Threat model
 
-| Adversary | Wants | Entry |
-| --- | --- | --- |
-| Curious tenant | another tenant's captures | IDOR, vault proxy, export |
+| Adversary                  | Wants                         | Entry                            |
+| -------------------------- | ----------------------------- | -------------------------------- |
+| Curious tenant             | another tenant's captures     | IDOR, vault proxy, export        |
 | Tenant who read the source | free service, forged captures | client-side trust, unsigned POST |
-| Scanner/security vendor | fingerprint us | markers, headers, 404 shape |
-| Network attacker | credentials in flight | TLS only end to end |
-| Stolen staff laptop | everything | admin routes, DB creds |
-| Cloudflare insider | rows, not keys | KV/R2/DB |
-| Leaked link token holder | replay a capture | token scope, dedupe |
+| Scanner/security vendor    | fingerprint us                | markers, headers, 404 shape      |
+| Network attacker           | credentials in flight         | TLS only end to end              |
+| Stolen staff laptop        | everything                    | admin routes, DB creds           |
+| Cloudflare insider         | rows, not keys                | KV/R2/DB                         |
+| Leaked link token holder   | replay a capture              | token scope, dedupe              |
 
 Non-adversaries: the victim (has no account), the mail provider.
 

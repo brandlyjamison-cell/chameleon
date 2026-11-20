@@ -127,16 +127,16 @@ Clock skew across Workers is < 1 s and irrelevant to a 15-minute bucket. Postgre
 
 ## Failure matrix
 
-| Failure | Result |
-| --- | --- |
-| KV miss on link | 404, no capture |
-| token invalid | 404, no capture |
-| entitlement expired | 404, no capture |
-| encrypt error | 302 still sent, metric increment (capture lost) |
-| queue send error | 302 still sent, metric increment |
-| consumer down | backlog, victims unaffected |
-| Postgres down at consume | retries, `captures_dead` after 5 |
-| R2 down | session captures stall, credential captures unaffected |
+| Failure                  | Result                                                 |
+| ------------------------ | ------------------------------------------------------ |
+| KV miss on link          | 404, no capture                                        |
+| token invalid            | 404, no capture                                        |
+| entitlement expired      | 404, no capture                                        |
+| encrypt error            | 302 still sent, metric increment (capture lost)        |
+| queue send error         | 302 still sent, metric increment                       |
+| consumer down            | backlog, victims unaffected                            |
+| Postgres down at consume | retries, `captures_dead` after 5                       |
+| R2 down                  | session captures stall, credential captures unaffected |
 
 ## Source classification
 

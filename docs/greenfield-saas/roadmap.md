@@ -7,18 +7,18 @@ touches is current.
 
 ## Shape
 
-| Stage | Name | Ships |
-| --- | --- | --- |
-| 1 | Skeleton repo and contracts | workspace, CI, 404 constant, contract tests |
-| 2 | Schema, RLS, repos | migrations, isolation suite, counters |
-| 3 | Auth and org | Better Auth, orgs, service provisioning shell |
-| 4 | Domains | TXT verify, CF for SaaS, tombstones |
-| 5 | Links and resolution | minting, signed tokens, KV, unbranded 404 |
-| 6 | Templates | skeleton, brand map (30), assets, profiles |
-| 7 | Capture pipeline | seal, queue, consumer, dedupe, prune |
-| 8 | Vault and gate | passcode, DEK wrap, vault, export |
-| 9 | Billing and expiry | NowPayments, flags, sweeper, warnings |
-| 10 | Demo, admin, hardening | demo, admin, observability, launch |
+| Stage | Name                        | Ships                                         |
+| ----- | --------------------------- | --------------------------------------------- |
+| 1     | Skeleton repo and contracts | workspace, CI, 404 constant, contract tests   |
+| 2     | Schema, RLS, repos          | migrations, isolation suite, counters         |
+| 3     | Auth and org                | Better Auth, orgs, service provisioning shell |
+| 4     | Domains                     | TXT verify, CF for SaaS, tombstones           |
+| 5     | Links and resolution        | minting, signed tokens, KV, unbranded 404     |
+| 6     | Templates                   | skeleton, brand map (30), assets, profiles    |
+| 7     | Capture pipeline            | seal, queue, consumer, dedupe, prune          |
+| 8     | Vault and gate              | passcode, DEK wrap, vault, export             |
+| 9     | Billing and expiry          | NowPayments, flags, sweeper, warnings         |
+| 10    | Demo, admin, hardening      | demo, admin, observability, launch            |
 
 ## Release gates
 

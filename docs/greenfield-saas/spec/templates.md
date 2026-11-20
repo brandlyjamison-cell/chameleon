@@ -15,14 +15,14 @@ One skeleton, three partial sets:
 
 Slots, all CSS custom properties or text nodes, all server-substituted:
 
-| Slot | Source | Notes |
-| --- | --- | --- |
-| `--bg`, `--surface`, `--fg`, `--accent`, `--radius`, `--font` | brand/template or profile | contrast-corrected |
-| logo | R2, pinned at template creation | max 320×96, WebP |
-| favicon | R2, pinned | served as the page icon |
-| heading | brand/template or profile | e.g. "Sign in" |
-| email label, password label, button label | brand/template or profile | copied from the real page |
-| backdrop | R2, blurred + dimmed WebP | fixed, behind a card |
+| Slot                                                          | Source                          | Notes                     |
+| ------------------------------------------------------------- | ------------------------------- | ------------------------- |
+| `--bg`, `--surface`, `--fg`, `--accent`, `--radius`, `--font` | brand/template or profile       | contrast-corrected        |
+| logo                                                          | R2, pinned at template creation | max 320×96, WebP          |
+| favicon                                                       | R2, pinned                      | served as the page icon   |
+| heading                                                       | brand/template or profile       | e.g. "Sign in"            |
+| email label, password label, button label                     | brand/template or profile       | copied from the real page |
+| backdrop                                                      | R2, blurred + dimmed WebP       | fixed, behind a card      |
 
 The skeleton is isomorphic string templating (no DOM, no runtime) so the same
 code renders in the Worker and in the dashboard preview. It is a pure function
@@ -106,7 +106,7 @@ accepted. Tenant edits never touch the brand map or other tenants.
 
 `OPEN-TPL-02`: profile generation for a domain seen by another tenant — reuse
 across tenants (cheaper, and brands are public) or scope per org (tenant edits
-do not collide). Current lean: reuse the generated row, scope the *edit*.
+do not collide). Current lean: reuse the generated row, scope the _edit_.
 
 ## Assets
 

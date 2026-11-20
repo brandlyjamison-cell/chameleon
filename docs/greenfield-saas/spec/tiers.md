@@ -7,16 +7,16 @@ of active services, computed server-side at checkout time from the tier rows.
 Two tiers. No free tier, no trial. Card payments are out of scope; NowPayments
 crypto only, monthly.
 
-| | Starter | Pro |
-| --- | --- | --- |
-| Price | $19/mo | $49/mo |
-| Links (slots) | 5 | 20 |
-| Domains (slots) | 2 | 5 |
-| Capture cap (rows, live) | 50,000 | 250,000 |
-| CSV export | yes | yes |
-| Webhook + API | no | yes |
-| Gate modes | all | all |
-| Brands | all 30 | all 30 |
+|                          | Starter | Pro     |
+| ------------------------ | ------- | ------- |
+| Price                    | $19/mo  | $49/mo  |
+| Links (slots)            | 5       | 20      |
+| Domains (slots)          | 2       | 5       |
+| Capture cap (rows, live) | 50,000  | 250,000 |
+| CSV export               | yes     | yes     |
+| Webhook + API            | no      | yes     |
+| Gate modes               | all     | all     |
+| Brands                   | all 30  | all 30  |
 
 No other lines. Nothing is metered by bytes, clicks, or visits in v1. Rendering
 is the cost centre and it is not counted.
@@ -37,7 +37,7 @@ the transaction re-reads them.
 
 ## Capture cap behaviour
 
-Storage is unbounded in *time* — nothing expires out from under the owner — but
+Storage is unbounded in _time_ — nothing expires out from under the owner — but
 bounded by row count, oldest first. Consequences, stated plainly so support can
 quote them:
 
@@ -80,12 +80,12 @@ until under 5, and the capture cap becomes 50k with an immediate prune batch.
 
 ## Tier change semantics
 
-| Change | Effect |
-| --- | --- |
-| Starter → Pro | counters untouched, caps raised on payment confirm |
-| Pro → Starter | caps lowered, prune batch, mint blocked over cap |
-| Renewal | `expires_at` extended by one month from max(now, current end) |
-| Lapse | no change to data, links 404 (INV-EDGE-06) |
+| Change        | Effect                                                        |
+| ------------- | ------------------------------------------------------------- |
+| Starter → Pro | counters untouched, caps raised on payment confirm            |
+| Pro → Starter | caps lowered, prune batch, mint blocked over cap              |
+| Renewal       | `expires_at` extended by one month from max(now, current end) |
+| Lapse         | no change to data, links 404 (INV-EDGE-06)                    |
 
 Tier price is snapshotted onto the payment row at checkout, so a later price
 change does not rewrite history.

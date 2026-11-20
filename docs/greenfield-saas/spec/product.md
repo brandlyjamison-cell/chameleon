@@ -47,15 +47,15 @@ its payload.
 
 ## Surfaces
 
-| Surface | Host | Audience |
-| --- | --- | --- |
-| Dashboard | control host | tenant |
-| Links (resolution, render, capture, 404) | tenant domains | victim, scanner |
-| Vault | control host, within dashboard, gated | tenant |
-| Demo | control host (public route) | prospect |
-| Admin | control host, `/admin` | staff |
-| API | control host, `/api/v1` | Pro tenants |
-| Webhooks | egress from platform | tenant endpoints |
+| Surface                                  | Host                                  | Audience         |
+| ---------------------------------------- | ------------------------------------- | ---------------- |
+| Dashboard                                | control host                          | tenant           |
+| Links (resolution, render, capture, 404) | tenant domains                        | victim, scanner  |
+| Vault                                    | control host, within dashboard, gated | tenant           |
+| Demo                                     | control host (public route)           | prospect         |
+| Admin                                    | control host, `/admin`                | staff            |
+| API                                      | control host, `/api/v1`               | Pro tenants      |
+| Webhooks                                 | egress from platform                  | tenant endpoints |
 
 ## Scope at launch
 

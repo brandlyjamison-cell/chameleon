@@ -1,0 +1,17 @@
+{
+  "name": "@chameleon/control",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chameleon/contracts": "workspace:*",
+    "@chameleon/engine": "workspace:*",
+    "@chameleon/skeleton": "workspace:*",
+    "server-only": "^0.0.1"
+  }
+}

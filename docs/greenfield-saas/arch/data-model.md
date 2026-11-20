@@ -84,19 +84,19 @@ idempotency(id, key, scope, response, created_at)
 
 ## Key constraints
 
-| Constraint | Table |
-| --- | --- |
-| `unique (service_id, slug) where deleted_at is null` | links |
-| `unique (lower(hostname)) where deleted_at is null` | domains |
-| `unique (org_id, lower(email))` | users via memberships* |
-| `unique (provider_payment_id)` | payments |
-| `unique (provider, provider_event_id)` | webhook_events |
-| `unique (service_id, email_hash, dedupe_bucket)` | captures |
-| `fk (service_id, org_id) references services(id, org_id)` | every service child |
-| `check kind in ('credential','session','mixed')` | captures |
-| `check source in ('human','decoy','scanner')` | captures |
-| `check status in ('new','valid','invalid')` | captures |
-| `check gate_mode in ('always','remember_30d','off')` | services |
+| Constraint                                                | Table                  |
+| --------------------------------------------------------- | ---------------------- |
+| `unique (service_id, slug) where deleted_at is null`      | links                  |
+| `unique (lower(hostname)) where deleted_at is null`       | domains                |
+| `unique (org_id, lower(email))`                           | users via memberships* |
+| `unique (provider_payment_id)`                            | payments               |
+| `unique (provider, provider_event_id)`                    | webhook_events         |
+| `unique (service_id, email_hash, dedupe_bucket)`          | captures               |
+| `fk (service_id, org_id) references services(id, org_id)` | every service child    |
+| `check kind in ('credential','session','mixed')`          | captures               |
+| `check source in ('human','decoy','scanner')`             | captures               |
+| `check status in ('new','valid','invalid')`               | captures               |
+| `check gate_mode in ('always','remember_30d','off')`      | services               |
 
 \* users are global; membership is `(org_id, user_id)`. One user may hold
 memberships in several orgs, one org each for now.
@@ -146,8 +146,8 @@ an app write to them errors instead of drifting.
   `ON CONFLICT DO NOTHING` + `RETURNING` tells the consumer to bump
   `captures_suppressed`.
 - Pruning runs after insert in the same transaction: `delete from captures where
-  id in (select id from captures where service_id = $1 order by received_at
-  asc, id asc offset $cap)`, batched to 500, rows copied into `prune_queue`.
+id in (select id from captures where service_id = $1 order by received_at
+asc, id asc offset $cap)`, batched to 500, rows copied into `prune_queue`.
 
 ## Payloads
 
@@ -158,17 +158,17 @@ with a 50KB reject above.
 
 ## Retention
 
-| Data | Kept |
-| --- | --- |
-| captures | until pruned by cap or deleted by owner |
-| captures of expired service | kept, read-only, 30 days after archive, then org-level retention |
-| profiles | 30 days, refreshed on hit |
-| links | soft-deleted 30 days, then hard |
-| domains | tombstone 30 days after delete, then row hardened to hostname-only tombstone (1 year) |
-| payments/invoices | 7 years |
-| audit_log | 2 years |
-| webhook_events | 90 days |
-| access logs (Axiom) | 14 days |
+| Data                        | Kept                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| captures                    | until pruned by cap or deleted by owner                                               |
+| captures of expired service | kept, read-only, 30 days after archive, then org-level retention                      |
+| profiles                    | 30 days, refreshed on hit                                                             |
+| links                       | soft-deleted 30 days, then hard                                                       |
+| domains                     | tombstone 30 days after delete, then row hardened to hostname-only tombstone (1 year) |
+| payments/invoices           | 7 years                                                                               |
+| audit_log                   | 2 years                                                                               |
+| webhook_events              | 90 days                                                                               |
+| access logs (Axiom)         | 14 days                                                                               |
 
 ## Deletion cascade
 

@@ -51,18 +51,18 @@ chameleon/
 
 ## Dependency rules
 
-| Package | May import |
-| --- | --- |
-| contracts | zod |
-| skeleton | contracts |
-| engine | contracts, skeleton, brandmap |
-| crypto | contracts |
-| db | contracts |
-| brandmap | contracts |
-| ui | contracts, ui |
-| control | contracts, db, engine, skeleton, crypto, ui, brandmap |
-| edge | contracts, db, engine, skeleton, crypto, brandmap |
-| pipeline | contracts, db, engine, crypto, brandmap |
+| Package   | May import                                            |
+| --------- | ----------------------------------------------------- |
+| contracts | zod                                                   |
+| skeleton  | contracts                                             |
+| engine    | contracts, skeleton, brandmap                         |
+| crypto    | contracts                                             |
+| db        | contracts                                             |
+| brandmap  | contracts                                             |
+| ui        | contracts, ui                                         |
+| control   | contracts, db, engine, skeleton, crypto, ui, brandmap |
+| edge      | contracts, db, engine, skeleton, crypto, brandmap     |
+| pipeline  | contracts, db, engine, crypto, brandmap               |
 
 Forbidden everywhere: `apps/*` importing another `apps/*`; `contracts` importing
 anything but zod; `skeleton` importing db/crypto; anything but `control` importing
