@@ -167,10 +167,10 @@ Lean: no; keep admin blind and get plaintext through the tenant.
 
 Lean: yes, but do not expose rotation in the UI until needed.
 
-### OPEN-SEC-03 — One user per org, or allow one invited member? (blocks 3)
+### OPEN-SEC-03 — closed 2026-11-21: one login per org; admin is a flag
 
-Schema supports memberships either way. Lean: invite one member after launch, keep
-the UI owner-only.
+ADR 0022: an org is exactly one person. No invite, no seats, no role picker. Admin
+is `users.is_admin` on the human, cross-tenant and passkey-gated.
 
 ### OPEN-SEC-04 — CSP `unsafe-inline` for the submit guard, or a per-render hash? (blocks 6)
 
@@ -222,10 +222,27 @@ Private repos on the free plan have no branch protection or rulesets, so `main` 
 guarded only by the local pre-push hook. Lean: pay for Pro; public is not viable
 while the schema and docs describe the product.
 
-### OPEN-ARCH-01 — VPS region? (blocks 7)
+### OPEN-ARCH-01 — closed 2026-11-21: the box already exists, same country as Neon
 
-Controls data-plane→control latency for vault calls only; renders are at the edge.
-Lean: nearest the first tenants' audience, revisit at 20 tenants.
+`65.98.5.195` (Verpex). Vault calls are one crossing, not two; revisit at 20 tenants.
+
+### OPEN-OPS-04 — Cloudflare for SaaS is not provisioned (blocks 4)
+
+The zone `mailerdeaon.bid` is active on the Free plan. `/zones/:id/custom_hostnames`
+answers `1404 No quota has been allocated` and `/zones/:id/subscription` says the
+zone has no active core subscription, so Cloudflare for SaaS cannot be enabled
+until the zone is at least Pro. Workers Paid is a separate need for Queues,
+Durable Objects and Browser Rendering (stages 6-9). Everything else is reachable
+with the current token. Lean: Pro before the first custom-hostname attach, Workers
+Paid before stage 6.
+
+### OPEN-OPS-05 — mailcow shares the box and owns 80/443 (blocks deploy)
+
+Proven: `http://65.98.5.195` answers a `Server: nginx` 301 from mailcow. Mail to
+the domain arrives through Cloudflare Email Routing and the MX records are
+Cloudflare's, so wiping the box moves no mail; only mailcow's mailboxes die.
+Lean: dump mailcow first, then reinstall Ubuntu 24.04 and run `ops/provision.sh`;
+if the mailboxes matter, a second box re-opens ADR 0023.
 
 ### OPEN-INC-01 — Does freezing `app_rw` writes during a leak need a drain step? (blocks 10)
 
