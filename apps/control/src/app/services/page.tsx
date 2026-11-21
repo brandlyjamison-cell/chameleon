@@ -26,8 +26,22 @@ export default async function Services() {
             <span className="pill">{service.status}</span>
           </div>
           <div className="row muted">
-            <span>{service.tier} tier</span>
+            <span>
+              {service.tier} tier · ${(service.priceCents / 100).toFixed(2)} / 30 days
+            </span>
+            <span>
+              {service.paidUntil && new Date(service.paidUntil) > new Date()
+                ? "paid"
+                : "payment due"}
+            </span>
+          </div>
+          <div className="row muted">
             <span>{service.activatedAt ? "activated" : "not activated"}</span>
+            <span>
+              {service.paidUntil
+                ? `through ${new Date(service.paidUntil).toLocaleDateString()}`
+                : ""}
+            </span>
           </div>
         </a>
       ))}

@@ -97,7 +97,7 @@ describe.skipIf(!hasDb)("activation (acceptance 1/2/3/7)", () => {
     expect(after.activated_at).not.toBeNull();
     expect(after.dek_wrapped?.byteLength).toBe(40); // AES-KW of 32 bytes
     expect(after.passcode_salt?.byteLength).toBe(16);
-    expect(after.passcode_hash?.toString("utf8")).not.toBe("vault passcode 9");
+    expect(after.passcode_hash?.toString("utf8")).not.toBe("4821");
     expect(after.token_secret?.byteLength).toBe(32);
 
     // Re-run: no second wrap, no duplicate row.
@@ -127,7 +127,7 @@ describe.skipIf(!hasDb)("activation (acceptance 1/2/3/7)", () => {
       [id],
     );
     const res = await activate(s.jar, id, {
-      passcode: "another pass 9",
+      passcode: "9999",
       gateMode: "always",
     });
     expect(res.headers.get("location")).toContain("error=passcode_mismatch");

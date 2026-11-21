@@ -1,9 +1,9 @@
 import { betterAuth } from "better-auth";
-import { passkey } from "@better-auth/passkey";
 import { PostgresDialect } from "kysely";
 import { randomUUID } from "node:crypto";
 import { requireDb } from "./db";
-import { button, sendMail, shell } from "./mail";
+import { verificationMail } from "./mail";
+import { enqueueEmail } from "./mailqueue";
 
 export const BASE_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
@@ -53,38 +53,24 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, token }) => {
       const url = `${BASE_URL}/api/auth/verify-email?token=${token}&callbackURL=/welcome`;
-      console.log(`[mail] verify ${user.email}: ${url}`);
-      await sendMail({
-        to: user.email,
-        subject: "Confirm your Chameleon address",
-        text: `Confirm ${user.email} to finish setting up Chameleon:
-${url}
-
-The link is good for 24 hours.`,
-        html: shell(
-          "Confirm your address",
-          `<p style="margin:0 0 18px;color:#b6c2cf">One click and ${user.email} stops being provisional. The link is good for 24 hours.</p>${button(url, "Confirm address")}`,
-        ),
-      });
+      const mail = verificationMail(user.email, url);
+      await enqueueEmail({ kind: "verify", to: user.email, ...mail });
     },
   },
-  plugins: [
-    passkey({
-      rpID: new URL(BASE_URL).hostname,
-      rpName: "Chameleon",
-      origin: BASE_URL,
-    }),
-  ],
   databaseHooks: {
     // `users` is the tenant-facing mirror memberships point at. The hook is
     // idempotent so a retried signup cannot double it.
     user: {
       create: {
         after: async (user) => {
+          const admins = (process.env.ADMIN_EMAILS ?? "")
+            .split(",")
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean);
           await requireDb().pool.query(
-            `insert into users (id, email, name) values ($1, $2, $3)
+            `insert into users (id, email, name, is_admin) values ($1, $2, $3, $4)
              on conflict (id) do update set email = excluded.email`,
-            [user.id, user.email, user.name],
+            [user.id, user.email, user.name, admins.includes(user.email.toLowerCase())],
           );
         },
       },

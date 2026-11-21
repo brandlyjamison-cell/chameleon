@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * The local gate. There is no CI/CD by decision (ADR 0021): this runs from the
- * pre-commit and pre-push hooks, and by hand. A red gate is a blocked commit.
+ * The gate. Deploy stays manual (ADR 0021) but CI runs these same steps on a PR,
+ * so the local hooks can no longer be the only thing standing between a mistake
+ * and `main`.
  *
  * Full runs every check. Fast is what a commit pays for.
  */

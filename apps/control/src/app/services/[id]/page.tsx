@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { NotFoundError } from "@chameleon/db";
 import { requirePageSession } from "../../../server/session";
+import { latestPayment } from "../../../server/billing";
+import { addAddress, listAddresses, queueLatestCapture } from "../../../server/forwards";
 import { getService } from "../../../server/services";
 import {
   checkDomain,
@@ -12,7 +14,7 @@ import {
 const errors: Record<string, string> = {
   email_unverified: "Verify your email before activating this service.",
   passcode_mismatch: "A passcode is already set with a different value.",
-  invalid_input: "Passcode needs 10+ characters with a letter and a digit.",
+  invalid_input: "The passcode must be exactly 4 digits.",
   owner_only: "Only the org owner can do that.",
   bad_hostname: "That is not a hostname (no scheme, no path).",
   domain_exists: "That hostname is already attached here.",
@@ -20,6 +22,12 @@ const errors: Record<string, string> = {
   cap: "No domain slots left on this tier.",
   zone_full: "The platform is at its live-domain ceiling.",
   not_found: "That domain is gone.",
+  payment_required: "Pay for this service before activating it.",
+  billing_off: "Payments are not configured on this host yet.",
+  service_archived: "This service is archived.",
+  address_cap: "Five forwarding addresses is the ceiling.",
+  address_unverified: "Confirm that address before forwarding to it.",
+  capture_malformed: "That capture has nothing to send.",
 };
 
 function codeOf(error: unknown): string {
@@ -31,7 +39,13 @@ export default async function ServiceDetail({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; activated?: string; domain_added?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    activated?: string;
+    domain_added?: string;
+    forward_added?: string;
+    forwarded?: string;
+  }>;
 }) {
   const { id } = await params;
   const session = await requirePageSession();
@@ -42,11 +56,14 @@ export default async function ServiceDetail({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
-  const { error, activated, domain_added } = await searchParams;
+  const { error, activated, domain_added, forward_added, forwarded } = await searchParams;
   const live =
     service.status === "active" &&
     service.expiresAt !== null &&
     new Date(service.expiresAt) > new Date();
+  const paid = service.paidUntil !== null && new Date(service.paidUntil) > new Date();
+  const payment = paid ? null : await latestPayment(session, service.id);
+  const price = `$${(service.priceCents / 100).toFixed(2)}`;
 
   return (
     <main className="app" id="content">
@@ -57,6 +74,12 @@ export default async function ServiceDetail({
       {domain_added && (
         <p className="muted">Hostname added. Publish the TXT record, then check.</p>
       )}
+      {forward_added && (
+        <p className="muted">
+          Address saved. If it is not your signup address, confirm the link we sent.
+        </p>
+      )}
+      {forwarded && <p className="muted">Latest capture queued for mail.</p>}
 
       <div className="card">
         <div className="row">
@@ -69,7 +92,17 @@ export default async function ServiceDetail({
         </div>
         <div className="row">
           <span>tier</span>
-          <span>{service.tier}</span>
+          <span>
+            {service.tier} · {price} / 30 days
+          </span>
+        </div>
+        <div className="row">
+          <span>paid through</span>
+          <span>
+            {service.paidUntil
+              ? new Date(service.paidUntil).toLocaleDateString()
+              : "unpaid"}
+          </span>
         </div>
         <div className="row">
           <span>gate</span>
@@ -85,12 +118,38 @@ export default async function ServiceDetail({
         </div>
       </div>
 
-      {!service.activatedAt && (
+      {!paid && (
+        <section id="billing">
+          <h2>Payment</h2>
+          <p className="muted">
+            Each service is billed on its own: {price} buys 30 days. Paying first keeps an
+            unpaid service from holding a wrapped key nobody invoiced for.
+          </p>
+          {payment?.status === "pending" && payment.checkoutUrl ? (
+            <p>
+              <a className="btn" href={payment.checkoutUrl}>
+                Resume payment
+              </a>
+            </p>
+          ) : (
+            <form action={`/api/services/${service.id}/checkout`} method="post">
+              <button type="submit">Subscribe — {price} for 30 days</button>
+            </form>
+          )}
+          {payment && <p className="fine">Last payment: {payment.status}.</p>}
+          <p className="fine">
+            Crypto only, through NowPayments. The period is fixed at checkout; a confirmed
+            payment is what unlocks activation.
+          </p>
+        </section>
+      )}
+
+      {!service.activatedAt && paid && (
         <>
           <h2>Activate</h2>
           <p className="muted">
-            The passcode wraps the service key. Without it the vault cannot be opened —
-            including by us.
+            Four digits wrap the service key. Lose them and the vault cannot be opened —
+            not even by us.
           </p>
           <form action={`/api/services/${service.id}/activate`} method="post">
             <label>
@@ -100,8 +159,11 @@ export default async function ServiceDetail({
                 type="password"
                 autoComplete="new-password"
                 required
-                minLength={10}
-                maxLength={128}
+                inputMode="numeric"
+                pattern="\d{4}"
+                minLength={4}
+                maxLength={4}
+                placeholder="••••"
               />
             </label>
             <label>
@@ -117,7 +179,14 @@ export default async function ServiceDetail({
         </>
       )}
 
+      {service.activatedAt && !paid && (
+        <p className="error">
+          The paid period has ended. Renew above; links stop resolving once it lapses.
+        </p>
+      )}
+
       {service.activatedAt && <Domains id={service.id} session={session} />}
+      {service.activatedAt && <Forwarding id={service.id} email={session.email} />}
     </main>
   );
 }
@@ -201,6 +270,75 @@ async function Domains({
           <input name="hostname" placeholder="login.acme.com" required />
         </label>
         <button type="submit">Add hostname</button>
+      </form>
+    </section>
+  );
+}
+
+async function Forwarding({ id, email }: { id: string; email: string }) {
+  const session = await requirePageSession();
+  const addresses = await listAddresses(session);
+
+  async function add(formData: FormData) {
+    "use server";
+    const ctx = await requirePageSession();
+    try {
+      await addAddress(ctx, String(formData.get("email") ?? ""));
+    } catch (error) {
+      redirect(`/services/${id}?error=${codeOf(error)}#forwarding`);
+    }
+    redirect(`/services/${id}?forward_added=1#forwarding`);
+  }
+
+  async function sendLatest(formData: FormData) {
+    "use server";
+    const ctx = await requirePageSession();
+    try {
+      await queueLatestCapture(ctx, id, String(formData.get("addressId") ?? ""));
+    } catch (error) {
+      redirect(`/services/${id}?error=${codeOf(error)}#forwarding`);
+    }
+    redirect(`/services/${id}?forwarded=1#forwarding`);
+  }
+
+  return (
+    <section id="forwarding">
+      <h2>Forwarding</h2>
+      <p className="muted">
+        Captures can also go straight to mail, queued through the platform sender. Your
+        signup address ({email}) is trusted already; any other address must be confirmed
+        first, so a typo cannot quietly swallow a capture.
+      </p>
+      {addresses.length === 0 && (
+        <p className="muted">No forwarding addresses yet — the signup address works.</p>
+      )}
+      {addresses.map((address) => (
+        <div className="card" key={address.id}>
+          <div className="row">
+            <strong>{address.email}</strong>
+            <span className="pill">{address.status}</span>
+          </div>
+          <div className="row">
+            <form action={sendLatest}>
+              <input type="hidden" name="addressId" value={address.id} />
+              <button type="submit" className="link">
+                Forward latest capture
+              </button>
+            </form>
+            <form action={`/api/forwards/${address.id}/delete`} method="post">
+              <button type="submit" className="link">
+                Remove
+              </button>
+            </form>
+          </div>
+        </div>
+      ))}
+      <form action={add}>
+        <label>
+          Add an address
+          <input name="email" type="email" placeholder="you@elsewhere.com" required />
+        </label>
+        <button type="submit">Add for confirmation</button>
       </form>
     </section>
   );

@@ -1,0 +1,10 @@
+[Unit]
+Description=chameleon mail queue drain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=deploy
+EnvironmentFile=/etc/chameleon/env
+ExecStart=/usr/bin/curl -fsS -X POST -H "x-job-token: ${JOBS_TOKEN}" http://127.0.0.1:3000/api/jobs/mail

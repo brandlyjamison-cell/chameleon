@@ -3,13 +3,11 @@ import { ServiceTypeCodeSchema, TierCodeSchema, GateModeSchema } from "./service
 
 export const EmailSchema = z.string().trim().toLowerCase().email().max(254);
 
-/** 10–128, at least one letter and one digit. Deliberately not fussy. */
+/** Four digits. Short enough to type from memory, long enough for 310k PBKDF2. */
 export const PasscodeSchema = z
   .string()
-  .min(10)
-  .max(128)
-  .regex(/[A-Za-z]/, "needs a letter")
-  .regex(/[0-9]/, "needs a digit");
+  .trim()
+  .regex(/^\d{4}$/, "4 digits");
 
 export const SignupSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -44,6 +42,8 @@ export interface ServiceView {
   expiresAt: string | null;
   activatedAt: string | null;
   createdAt: string;
+  paidUntil: string | null;
+  priceCents: number;
 }
 
 export const SERVICE_VIEW_FIELDS = [
@@ -55,6 +55,8 @@ export const SERVICE_VIEW_FIELDS = [
   "expires_at",
   "activated_at",
   "created_at",
+  "paid_until",
+  "price_cents",
 ] as const;
 
 /** A bare hostname; normalisation and the real check are server-side. */

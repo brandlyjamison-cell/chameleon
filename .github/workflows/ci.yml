@@ -1,0 +1,43 @@
+name: gate
+
+# CI verifies; deploy stays manual (ADR 0021). This runs the same gate the
+# pre-push hook runs, so a PR cannot be greener than the operator's own machine.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Without these the db suites skip themselves; with them the full suite
+      # runs against the throwaway dev branch.
+      - name: gate
+        run: pnpm run ci
+        env:
+          DATABASE_URL_TEST: ${{ secrets.DATABASE_URL_TEST }}
+          DATABASE_URL_APP_RW: ${{ secrets.DATABASE_URL_TEST_APP_RW }}
+          DATABASE_URL_EDGE_RO: ${{ secrets.DATABASE_URL_TEST_EDGE_RO }}
+          DATABASE_URL_ADMIN: ${{ secrets.DATABASE_URL_TEST_ADMIN }}
+          MAIL_FROM: noreply@example.test
+          ADMIN_EMAILS: operator@example.test

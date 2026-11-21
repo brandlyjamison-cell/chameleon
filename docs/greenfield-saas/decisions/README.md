@@ -30,6 +30,12 @@ Index:
 | 0018 | The demo runs on an isolated throwaway tenant         | accepted |
 | 0019 | `kind` is written by the engine, not the route        | accepted |
 | 0020 | Vault verification runs on the data plane             | accepted |
-| 0021 | Manual deploy with a local gate, no CI pipeline       | accepted |
+| 0021 | Manual deploy; gate runs locally and in CI            | accepted |
+| 0022 | One login per org; admin is a flag on the human       | accepted |
+| 0023 | The VPS runs the control plane only                   | accepted |
+| 0024 | Sessions, passcodes and verification boundaries       | accepted |
+| 0025 | Domain verification by DoH, 30-day tombstone          | accepted |
+| 0026 | Billing is per service, payment before activation     | accepted |
+| 0027 | One mail queue; forwarding targets prove themselves   | accepted |
 
-Last reviewed: 2026-11-20
+Last reviewed: 2026-11-21

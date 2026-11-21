@@ -1,4 +1,4 @@
-# ADR 0021 — Manual deploy and a local gate, no CI pipeline
+# ADR 0021 — Manual deploy; the gate now also runs in CI
 
 Status: accepted (2026-11-20)
 
@@ -11,7 +11,11 @@ cost.
 
 ## Decision
 
-No `.github/workflows`. The gate is `scripts/gate.mjs`, run by:
+Amended 2026-11-21: the free Actions allowance proved usable (Workers Paid and a
+second build pass since), so `.github/workflows/ci.yml` runs the same gate on pull
+requests and `main`. **Deploy is still manual** — no workflow holds the VPS key.
+
+The gate is `scripts/gate.mjs`, run by:
 
 - `pre-commit` → fast subset (secrets, lint, typecheck).
 - `pre-push` → full (adds format, boundary self-test, client-resolution check,
@@ -31,7 +35,10 @@ approvals because there is one account.
 
 - The gate cannot be skipped by pushing a branch; only `--no-verify` can, and that
   is visible in the log.
-- No green checkmark on GitHub. Status lives in the PR body checklist.
+- A red PR is red on GitHub too; the local hook and CI run the same steps, so
+  neither is stronger than the other.
+- CI holds a dev-branch database, never production. Without the four repo secrets
+  the db suites skip and the workflow still lints, typechecks and tests the rest.
 - Deploy is a human at a terminal; every deploy is at least a minute of attention,
   which is acceptable at this size.
 - Anything that truly needs a machine (nightly restore drill, synthetic checks)
@@ -39,8 +46,8 @@ approvals because there is one account.
 
 ## Rejected
 
-- **Actions with an unreliable account.** Red builds that nobody sees train people
-  to ignore red.
+- ~~Actions with an unreliable account.~~ Re-evaluated 2026-11-21: the account
+  works, and a PR check nobody can skip is worth it.
 - **Self-hosted runner on the VPS.** A second moving part before there is a product.
 
 ## Trigger to revisit
@@ -53,4 +60,4 @@ that must run on a machine other than the author's (restore drill, load test).
 Low. The gate steps already exist as scripts; a workflow calls the same
 `pnpm run ci`.
 
-Last reviewed: 2026-11-20
+Last reviewed: 2026-11-21
