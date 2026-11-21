@@ -57,12 +57,14 @@ export async function asTenant<T>(
 }
 
 export class CapError extends Error {
+  readonly status = 409;
   constructor(readonly slot: "link" | "domain") {
     super(`${slot}_slots_exhausted`);
   }
 }
 
 export class NotFoundError extends Error {
+  readonly status = 404;
   constructor() {
     super("not_found");
   }

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll } from "vitest";
-import { connect, disconnect } from "./helpers.js";
+import { connect, disconnect } from "./helpers";
 
 beforeAll(async () => {
   await connect();

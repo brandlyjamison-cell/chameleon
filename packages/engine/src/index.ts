@@ -1,3 +1,3 @@
-export * from "./types.js";
-export * from "./chameleon.js";
-export * from "./registry.js";
+export * from "./types";
+export * from "./chameleon";
+export * from "./registry";

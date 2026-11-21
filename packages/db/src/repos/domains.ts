@@ -1,6 +1,6 @@
 import type pg from "pg";
-import { assertFree, lockWithCaps } from "./services.js";
-import { orNotFound, type Ctx } from "../ctx.js";
+import { assertFree, lockWithCaps } from "./services";
+import { orNotFound, type Ctx } from "../ctx";
 
 export interface DomainRow {
   id: string;

@@ -45,6 +45,7 @@ const steps = [
         ],
       ]),
   ["typecheck", bin("tsc"), ["-p", "tsconfig.json"], true],
+  ["typecheck-control", bin("tsc"), ["-p", "apps/control/tsconfig.json"], true],
   ["test", bin("vitest"), ["run"], false],
 ];
 

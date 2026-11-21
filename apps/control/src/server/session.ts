@@ -1,0 +1,103 @@
+import "server-only";
+import { cookies as nextCookies } from "next/headers";
+import type { Ctx, Role } from "@chameleon/db";
+import { auth } from "./auth";
+import { asTenant } from "./db";
+import { conflict, forbidden, unauthorized } from "./errors";
+import { NULL_ORG } from "./orgs";
+
+export const ABSOLUTE_SESSION_MS = 12 * 60 * 60 * 1000;
+
+export interface PlatformSession {
+  readonly userId: string;
+  readonly email: string;
+  readonly emailVerified: boolean;
+  readonly orgId: string | null;
+  readonly role: Role | null;
+}
+
+type HeaderSource = { forEach(cb: (value: string, key: string) => void): void };
+
+async function toHeaders(input?: HeaderSource): Promise<Headers> {
+  const out = new Headers();
+  if (input) {
+    input.forEach((value, key) => out.set(key, value));
+    return out;
+  }
+  // In a server component the request headers are not forwarded reliably, but the
+  // cookie store always is.
+  const jar = await nextCookies();
+  out.set(
+    "cookie",
+    jar
+      .getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; "),
+  );
+  return out;
+}
+
+/**
+ * The membership lookup runs with only `app.user_id` set: the org is what we are
+ * trying to find, so there is no org GUC yet (INV-DATA-06).
+ */
+export async function membershipOf(
+  userId: string,
+): Promise<{ orgId: string; role: Role } | null> {
+  const ctx: Ctx = { orgId: NULL_ORG, userId, role: "member" };
+  return asTenant(ctx, async (c) => {
+    await c.query("select set_config('app.user_id', $1, true)", [userId]);
+    const { rows } = await c.query<{ org_id: string; role: Role }>(
+      "select org_id, role from memberships where user_id = $1 limit 1",
+      [userId],
+    );
+    const row = rows[0];
+    return row ? { orgId: row.org_id, role: row.role } : null;
+  });
+}
+
+export async function currentSession(
+  headers?: HeaderSource,
+): Promise<PlatformSession | null> {
+  const h = await toHeaders(headers);
+  const result = await auth.api.getSession({ headers: h });
+  if (!result) return null;
+
+  const created = new Date(result.session.createdAt).getTime();
+  if (!Number.isFinite(created) || Date.now() - created > ABSOLUTE_SESSION_MS) {
+    await auth.api.revokeSession({
+      body: { token: result.session.token },
+      headers: h,
+    });
+    return null;
+  }
+
+  const membership = await membershipOf(result.user.id);
+  return {
+    userId: result.user.id,
+    email: result.user.email,
+    emailVerified: Boolean(result.user.emailVerified),
+    orgId: membership?.orgId ?? null,
+    role: membership?.role ?? null,
+  };
+}
+
+/** Tenant context for repos. Throws 401/409 rather than 404. */
+export async function requireSession(
+  headers?: HeaderSource,
+): Promise<Ctx & { emailVerified: boolean }> {
+  const session = await currentSession(headers);
+  if (!session) throw unauthorized();
+  if (!session.orgId || !session.role) throw conflict("no_org");
+  return {
+    orgId: session.orgId,
+    userId: session.userId,
+    role: session.role,
+    emailVerified: session.emailVerified,
+  };
+}
+
+/** Owner is the only role that can spend money (tier) or slots (hosts). */
+export function requireOwner(ctx: Ctx): void {
+  if (ctx.role !== "owner") throw forbidden("owner_only");
+}

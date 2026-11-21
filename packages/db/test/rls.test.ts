@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 const hasDb = Boolean(process.env.DATABASE_URL_TEST);
-import { appRw, reset, seed } from "./helpers.js";
-import { withTenant, type Ctx } from "../src/ctx.js";
+import { appRw, reset, seed } from "./helpers";
+import { withTenant, type Ctx } from "../src/ctx";
 
 const db = {
   get pool() {

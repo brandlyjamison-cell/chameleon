@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 const hasDb = Boolean(process.env.DATABASE_URL_TEST);
-import { admin, appRw, reset, seed } from "./helpers.js";
-import * as captures from "../src/repos/captures.js";
-import * as links from "../src/repos/links.js";
-import * as services from "../src/repos/services.js";
-import * as domains from "../src/repos/domains.js";
-import { CapError, NotFoundError, withTenant, type Ctx } from "../src/ctx.js";
+import { admin, appRw, reset, seed } from "./helpers";
+import * as captures from "../src/repos/captures";
+import * as links from "../src/repos/links";
+import * as services from "../src/repos/services";
+import * as domains from "../src/repos/domains";
+import { CapError, NotFoundError, withTenant, type Ctx } from "../src/ctx";
 
 const db = {
   get pool() {

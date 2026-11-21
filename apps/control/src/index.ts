@@ -1,1 +1,1 @@
-export { previewHtml } from "./features/preview/render.js";
+export { previewHtml } from "./features/preview/render";

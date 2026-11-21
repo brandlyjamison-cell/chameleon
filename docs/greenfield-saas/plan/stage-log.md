@@ -41,3 +41,36 @@ Notes and deviations:
 Deferred: staging branch (stage 9), Hyperdrive (edge deploy, stage 4), pooling
 beyond the client pool, the counter trigger's `FOR UPDATE` contention at 250k-scale
 services.
+
+## Stage 3 � complete 2026-11-21
+
+Shipped: Better Auth (email+password, passkeys, signed verification links), the
+`auth_*` identity tables plus a `users` mirror, org provisioning on signup,
+service creation in `provisioning`, single-transaction activation (passcode
+verifier, AES-KW DEK wrap, `activated_at`, token secret, 30-day clock), the
+resume path, owner guard, tenant-scoped service routes and the dashboard shell
+(signup, login, welcome, list, card, passkeys).
+
+Gate proves: 10 new tests � hardened cookie flags on signup, org + owner
+membership created, no plaintext password, unverified can create but not
+activate, activation is idempotent and a second passcode is refused,
+`dek_wrapped` never leaves the API, member gets `403`, foreign id is `404` on API
+and page, idle and absolute expiry both rejected. Existing 40 db tests still pass.
+
+Notes and deviations:
+
+- Session idle/absolute split is deliberate: 1800 s rolling token plus a 12-hour
+  `createdAt` check in `requireSession` (ADR 0024).
+- Password hashing is Better Auth's scrypt, not the Argon2id in
+  `arch/security.md`; recorded in ADR 0024.
+- Verification is a signed JWT, so no row exists; the link is teed to
+  `MAIL_SINK` for tests instead of SMTP.
+- `passkey`, `auth_*` are ungranted to `edge_ro`: the edge never needs identity.
+- Route modules import `@chameleon/db` only via `apps/control/src/server/*`;
+  Turbopack needs extensionless relative imports, so the workspace dropped `.js`
+  specifiers.
+- Tests boot `next dev` on 3100 from `globalSetup`; a missing `DATABASE_URL_TEST`
+  skips the suite rather than failing the gate on a machine without a branch.
+
+Deferred: SMTP delivery, passkey list/delete UI, passcode reset (needs the old
+passcode until then), admin panel, VPS deploy (see `OPEN-OPS-05`).

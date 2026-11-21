@@ -4,7 +4,16 @@ import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "**/coverage/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.turbo/**",
+      "**/coverage/**",
+      "**/.next/**",
+      "**/next-env.d.ts",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -90,6 +99,23 @@ export default tseslint.config(
     },
   },
   {
+    // The server layer is the only place DB and node modules may be imported.
+    files: ["apps/control/src/server/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["cloudflare:*", "@cloudflare/*"],
+              message: "control must not import Worker bindings (INV-ARCH-01)",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // INV-ARCH-04: only the engine compares service types.
     files: ["apps/**/*.ts"],
     rules: {
@@ -143,7 +169,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/scripts/**/*.mjs", "scripts/**/*.mjs", "**/*.config.{js,mjs,ts,cjs}"],
+    files: [
+      "**/scripts/**/*.mjs",
+      "scripts/**/*.mjs",
+      "**/*.config.{js,mjs,ts,cjs}",
+      "**/test/*.ts",
+    ],
     languageOptions: { globals: globals.node },
     rules: { "no-console": "off", "@typescript-eslint/no-explicit-any": "off" },
   },

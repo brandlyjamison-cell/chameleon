@@ -4,7 +4,7 @@ import {
   CaptureRowSchema,
   EngineCaptureSchema,
   parseCredentialFields,
-} from "../src/capture.js";
+} from "../src/capture";
 
 describe("capture shape (INV-CAP-03)", () => {
   it("keeps the engine's kind when the client posts another", () => {

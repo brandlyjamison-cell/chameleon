@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { admin, migrator } from "./helpers.js";
+import { admin, migrator } from "./helpers";
 
 const hasDb = Boolean(process.env.DATABASE_URL_TEST);
 

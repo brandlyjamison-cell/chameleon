@@ -1,6 +1,6 @@
 import { parseCredentialFields, type EngineCapture } from "@chameleon/contracts";
 import { render as renderSkeleton } from "@chameleon/skeleton";
-import type { Engine } from "./types.js";
+import type { Engine } from "./types";
 
 /**
  * Static render. Captures credentials only: no OTP field is ever rendered, because

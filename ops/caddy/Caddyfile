@@ -1,0 +1,28 @@
+# One vhost. Unknown Host gets 444 (no body, nothing to fingerprint).
+{
+  email ${ACME_EMAIL}
+}
+
+app.mailerdeaon.bid {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3000 {
+    header_up X-Forwarded-Proto https
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+    -Server
+  }
+  log {
+    output file /var/log/caddy/app.log {
+      roll_size 20mb
+      roll_keep 5
+    }
+  }
+}
+
+:443 {
+  tls internal
+  respond 444
+}

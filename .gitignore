@@ -12,3 +12,7 @@ coverage/
 .DS_Store
 Thumbs.db
 .env.db
+
+# test mail sink
+
+apps/control/test/.tmp/
