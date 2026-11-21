@@ -3,7 +3,7 @@ import { cookies as nextCookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Ctx, Role } from "@chameleon/db";
 import { auth } from "./auth";
-import { asTenant } from "./db";
+import { asTenant, requireDb } from "./db";
 import { conflict, forbidden, unauthorized } from "./errors";
 import { NULL_ORG } from "./orgs";
 
@@ -15,6 +15,7 @@ export interface PlatformSession {
   readonly emailVerified: boolean;
   readonly orgId: string | null;
   readonly role: Role | null;
+  readonly isAdmin: boolean;
 }
 
 type HeaderSource = { forEach(cb: (value: string, key: string) => void): void };
@@ -74,12 +75,18 @@ export async function currentSession(
   }
 
   const membership = await membershipOf(result.user.id);
+  // `users` is the mirror row and carries the operator flag (ADR 0022).
+  const admin = await requireDb().pool.query<{ is_admin: boolean }>(
+    "select is_admin from users where id = $1",
+    [result.user.id],
+  );
   return {
     userId: result.user.id,
     email: result.user.email,
     emailVerified: Boolean(result.user.emailVerified),
     orgId: membership?.orgId ?? null,
     role: membership?.role ?? null,
+    isAdmin: Boolean(admin.rows[0]?.is_admin),
   };
 }
 
@@ -105,7 +112,7 @@ export async function requirePageSession(): Promise<
 
 export async function requireSession(
   headers?: HeaderSource,
-): Promise<Ctx & { emailVerified: boolean }> {
+): Promise<Ctx & { emailVerified: boolean; email: string }> {
   const session = await currentSession(headers);
   if (!session) throw unauthorized();
   if (!session.orgId || !session.role) throw conflict("no_org");
@@ -114,7 +121,16 @@ export async function requireSession(
     userId: session.userId,
     role: session.role,
     emailVerified: session.emailVerified,
+    email: session.email,
   };
+}
+
+/** The operator panel is cross-tenant, so a page needs the flag, not a role. */
+export async function requireAdminPage(): Promise<PlatformSession> {
+  const session = await currentSession();
+  if (!session) redirect("/login");
+  if (!session.isAdmin) redirect("/services");
+  return session;
 }
 
 /** Owner is the only role that can spend money (tier) or slots (hosts). */

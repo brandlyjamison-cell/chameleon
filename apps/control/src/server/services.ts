@@ -7,6 +7,7 @@ import type { z } from "zod";
 import { asTenant, requireDb } from "./db";
 import { conflict, invalid } from "./errors";
 import { createVerifier, derive, verifyPasscode } from "./passcode";
+import { assertPaid } from "./billing";
 import { KEK_KID, newDek, newSecret, unwrapDek, wrapDek } from "./keys";
 import { requireOwner } from "./session";
 
@@ -19,11 +20,16 @@ export interface ServiceView {
   expiresAt: string | null;
   activatedAt: string | null;
   createdAt: string;
+  paidUntil: string | null;
+  priceCents: number;
 }
 
+// Aliases are quoted because the view is camelCase and the row goes straight out.
 const VIEW_SQL = `
-  select s.id, s.status, st.code as service_type, t.code as tier, s.gate_mode,
-         s.expires_at, s.activated_at, s.created_at
+  select s.id, s.status, st.code as "serviceType", t.code as tier,
+         s.gate_mode as "gateMode", s.expires_at as "expiresAt",
+         s.activated_at as "activatedAt", s.created_at as "createdAt",
+         s.paid_until as "paidUntil", t.price_cents as "priceCents"
   from services s
   join service_types st on st.id = s.service_type_id
   join tiers t on t.id = s.tier_id`;
@@ -108,6 +114,9 @@ export async function activate(
 
   if (row.status === "active" && row.activated_at) return;
   if (!row.emailVerified) throw conflict("email_unverified");
+
+  // Money comes before keys: nothing is wrapped until the period is paid.
+  await assertPaid(c, serviceId);
 
   let salt = row.passcode_salt;
   let verifier = row.passcode_hash;

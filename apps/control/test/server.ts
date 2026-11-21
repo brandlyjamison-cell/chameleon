@@ -15,6 +15,7 @@ const UPSTREAM = 3199;
 const txt = new Map<string, string[]>();
 let cfMode: "entitlement" | "pending" | "active" = "entitlement";
 let upstream: Server | undefined;
+export const invoices: Record<string, unknown>[] = [];
 let child: ChildProcess | undefined;
 
 function startUpstream(): Promise<void> {
@@ -40,6 +41,20 @@ function startUpstream(): Promise<void> {
         const body = JSON.parse(raw) as { name: string; records: string[] };
         txt.set(body.name, body.records);
         send(200, { ok: true });
+      });
+    }
+    if (url.pathname === "/_invoices") {
+      return send(200, invoices);
+    }
+    if (url.pathname === "/v1/invoice" && req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => (raw += chunk));
+      return req.on("end", () => {
+        invoices.push(JSON.parse(raw) as Record<string, unknown>);
+        send(200, {
+          id: `inv_${invoices.length}`,
+          invoice_url: `http://127.0.0.1:${UPSTREAM}/pay/inv_${invoices.length}`,
+        });
       });
     }
     if (url.pathname === "/_cf" && req.method === "POST") {
@@ -104,11 +119,18 @@ export async function setup(): Promise<void> {
   const sink = resolve(sinkDir, "mail.ndjson");
   writeFileSync(sink, "");
   process.env.MAIL_SINK = sink;
+  // Keep the suite off Cloudflare: a real send is slow and rate-limited.
+  delete process.env.CLOUDFLARE_EMAIL_API_TOKEN;
+  process.env.MAIL_INLINE = "1";
   process.env.DNS_JSON_URL = `http://127.0.0.1:${UPSTREAM}/dns-query`;
   process.env.CF_API_BASE = `http://127.0.0.1:${UPSTREAM}/client/v4`;
   process.env.CLOUDFLARE_API_KEY = "test-token";
   process.env.CLOUDFLARE_ZONE_ID = "test-zone";
   process.env.JOBS_TOKEN = "test-job-token";
+  process.env.NOWPAYMENTS_API_BASE = `http://127.0.0.1:${UPSTREAM}/v1`;
+  process.env.NOWPAYMENTS_API_KEY = "test-key";
+  process.env.NOWPAYMENTS_IPN_SECRET = "test-ipn";
+  process.env.ADMIN_EMAILS = process.env.ADMIN_EMAILS ?? "operator@example.test";
   await startUpstream();
 
   child = spawn(

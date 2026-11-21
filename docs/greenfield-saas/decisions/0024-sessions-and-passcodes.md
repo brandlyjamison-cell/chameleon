@@ -28,6 +28,10 @@ passcode stored. What it does not say is where each is enforced.
 - **Password hashing is the library's scrypt** (`salt:hash`), not Argon2id as
   `arch/security.md` says. Better Auth's default is scrypt with a 16-byte salt;
   switching to Argon2 is a config change and an upgrade of existing hashes.
+- **The passcode is four digits.** Amended 2026-11-21 from "10+ characters with a
+  letter and a digit": operators type it from memory on a phone, and 310k PBKDF2
+  over a 16-byte salt absorbs the lost entropy. Four is the contract; the input is
+  numeric with `inputmode` and a 4-char mask.
 - **The passcode is never stored.** PBKDF2-SHA-256 (310k, 16-byte per-service
   salt) derives a 32-byte key; that key is stored as the verifier and used
   directly as the AES-KW wrapping key for the DEK. Verifier and wrap key being the

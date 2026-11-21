@@ -133,3 +133,25 @@ Also fixed in this pass:
   pages, 404 and the shell carry it too.
 - `x-robots-tag: noindex` on everything behind the login; `x-frame-options` and a
   permissions policy everywhere. HSTS/nosniff/referrer stay in Caddy, once.
+
+## Email system and admin — 2026-11-21
+
+Verification mail now leaves through a queue (`email_queue`) drained by a
+30-second systemd timer, not from inside the signup request. Receipts enqueue on
+a confirmed payment. Failure backoff 1→60 minutes, six tries. `MAIL_INLINE`
+drains in-process so the suite stays deterministic.
+
+Tenants can forward a capture to their signup address or to an external address
+they add and confirm (24-hour single-use token, five-address cap). The service
+page lists targets and can send the latest capture; plaintext goes to mail, the
+vault stays the source.
+
+The operator panel shipped: `/admin` counters, orgs, services, per-service
+detail, comp time, suspend/archive, free-text note, payment history. `is_admin`
+is set from `ADMIN_EMAILS` at signup and re-applied by the deploy.
+
+Passcodes are four digits; passkeys are gone (page, plugin, table). Footer only
+renders when signed out. Service activation is gated on a confirmed payment, so
+a new service shows a subscribe button before the passcode form.
+
+CI runs the same gate on PRs; deploy stays manual (ADR 0021 amended).

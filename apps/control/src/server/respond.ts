@@ -40,6 +40,11 @@ const messages: Record<string, string> = {
   passcode_mismatch: "That passcode does not match the one already set.",
   no_org: "Your account has no org yet.",
   service_not_active: "Activate the service before adding a hostname.",
+  payment_required: "Pay for this service before activating it.",
+  billing_off: "Payments are not configured on this host.",
+  address_cap: "Five forwarding addresses is the ceiling.",
+  address_unverified: "Confirm that address before forwarding to it.",
+  capture_malformed: "That capture has nothing to send.",
   domain_exists: "That hostname is already attached.",
   domain_tombstoned: "Another org used that hostname in the last 30 days.",
   domain_slots_exhausted: "No domain slots left on this tier.",
@@ -48,10 +53,14 @@ const messages: Record<string, string> = {
 };
 
 export function handleError(error: unknown): Response {
-  if (error instanceof HttpError) {
+  // Carried by shape as well as class: a `HttpError` thrown from another bundle
+  // fails `instanceof`, and a 409 must not degrade into "no slots".
+  const shaped = error as { status?: number; code?: string };
+  if (error instanceof HttpError || (typeof shaped.status === "number" && shaped.code)) {
+    const code = (error as { code: string }).code;
     return json(
-      { error: error.code, message: messages[error.code] ?? error.code },
-      error.status,
+      { error: code, message: messages[code] ?? code },
+      (error as { status: number }).status,
     );
   }
   if (error instanceof ZodError) {

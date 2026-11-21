@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@better-auth/passkey": "^1.7.27",
     "@chameleon/contracts": "workspace:*",
     "@chameleon/db": "workspace:^",
     "@chameleon/engine": "workspace:*",

@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {session ? (
               <>
                 <a href="/services">services</a>
-                <a href="/account/passkeys">passkeys</a>
+                {session.isAdmin && <a href="/admin">admin</a>}
                 <span className="who">{session.email}</span>
                 <form action="/api/logout" method="post">
                   <button type="submit" className="link">
@@ -73,12 +73,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </nav>
         </header>
         {children}
-        <footer className="site">
-          <span>Chameleon — rotating capture links for credential simulations.</span>
-          <span>
-            <a href="/login">sign in</a> · <a href="/signup">create an account</a>
-          </span>
-        </footer>
+        {!session && (
+          <footer className="site">
+            <span>Chameleon — rotating capture links for credential simulations.</span>
+            <span>
+              <a href="/login">sign in</a> · <a href="/signup">create an account</a>
+            </span>
+          </footer>
+        )}
       </body>
     </html>
   );

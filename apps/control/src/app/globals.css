@@ -690,3 +690,106 @@ main.auth .foot {
   font-size: 0.87rem;
   color: var(--muted);
 }
+
+/* ── admin ──────────────────────────────────────────────────────────────── */
+
+main.app.wide {
+  max-width: 60rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0 1.6rem;
+}
+
+.tiles .tile {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.tiles strong {
+  font:
+    650 1.4rem/1.1 ui-monospace,
+    monospace;
+  letter-spacing: -0.02em;
+}
+
+.tiles span {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: 1.4rem;
+}
+
+.tr {
+  display: grid;
+  gap: 0.2rem 1rem;
+  grid-template-columns: minmax(9rem, 1.4fr) repeat(4, minmax(4rem, 1fr)) auto;
+  align-items: center;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.tr:last-child {
+  border-bottom: 0;
+}
+
+.tr > a {
+  display: grid;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.tr > a:hover strong {
+  color: var(--accent);
+}
+
+.tr form {
+  margin: 0;
+}
+
+@media (max-width: 44rem) {
+  .tr {
+    grid-template-columns: 1fr auto;
+  }
+
+  .tr > *:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+textarea {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--ink-2);
+  color: var(--fg);
+  resize: vertical;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.actions form {
+  margin: 0;
+}
+
+.actions .ghost {
+  background: transparent;
+  border-color: var(--line-2);
+  color: var(--fg);
+}

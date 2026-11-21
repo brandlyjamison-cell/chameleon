@@ -127,10 +127,24 @@ await ssh(
       `CLOUDFLARE_ACCOUNT_ID=${process.env.CLOUDFLARE_ACCOUNT_ID ?? ""}`,
       `CLOUDFLARE_EMAIL_API_TOKEN=${process.env.CLOUDFLARE_EMAIL_API_TOKEN ?? ""}`,
       `MAIL_FROM=${process.env.MAIL_FROM ?? `noreply@${domain}`}`,
+      `ADMIN_EMAILS=${process.env.ADMIN_EMAILS ?? ""}`,
+      `NOWPAYMENTS_API_KEY=${process.env.NOWPAYMENTS_API_KEY ?? ""}`,
+      `NOWPAYMENTS_IPN_SECRET=${process.env.NOWPAYMENTS_IPN_SECRET ?? ""}`,
       "",
     ].join("\n"),
   },
 );
+
+// The flag is data, not config: an operator already signed up needs the row
+// flipped, not just the env var for future signups.
+console.log("→ admin flag");
+await new Promise((done, fail) => {
+  const child = spawn(process.execPath, ["scripts/bootstrap-admin.mjs"], {
+    stdio: "inherit",
+    env: { ...process.env, BOOTSTRAP_DB_URL: prodDbUrl },
+  });
+  child.on("close", (code) => (code === 0 ? done() : fail(new Error("admin flag"))));
+});
 
 console.log("→ stage");
 // `install -d -o` needs root; the tree must end up owned by deploy so tar can
@@ -170,9 +184,9 @@ console.log("→ job units");
 await ssh("sudo install -d -m 0755 -o deploy -g deploy /tmp/chameleon-ops");
 await ship(resolve("ops"), "/tmp/chameleon-ops");
 await ssh(
-  "sudo install -m 0644 /tmp/chameleon-ops/systemd/chameleon-domains.service /etc/systemd/system/ && " +
-    "sudo install -m 0644 /tmp/chameleon-ops/systemd/chameleon-domains.timer /etc/systemd/system/ && " +
-    "sudo systemctl daemon-reload && sudo systemctl enable --now chameleon-domains.timer",
+  "for unit in chameleon-domains.service chameleon-domains.timer chameleon-mail.service chameleon-mail.timer; do " +
+    "sudo install -m 0644 /tmp/chameleon-ops/systemd/$unit /etc/systemd/system/ || exit 1; done && " +
+    "sudo systemctl daemon-reload && sudo systemctl enable --now chameleon-domains.timer chameleon-mail.timer",
 );
 // Prove the token path here rather than trusting the unit file.
 await ssh("sudo systemctl start chameleon-domains");
@@ -190,6 +204,22 @@ const job = await new Promise((done) => {
 });
 if (!/"checked"/.test(job)) {
   console.error(`✗ domain job did not answer: ${job.trim().slice(-200)}`);
+  process.exit(1);
+}
+// Same proof for mail: the timer is useless if the token path is wrong.
+await ssh("sudo systemctl start chameleon-mail");
+const mailJob = await new Promise((done) => {
+  const child = spawn(
+    "ssh",
+    [...sshBase, target, "sudo journalctl -u chameleon-mail -n 5 --no-pager -o cat"],
+    { stdio: ["ignore", "pipe", "inherit"] },
+  );
+  let out = "";
+  child.stdout?.on("data", (chunk) => (out += chunk));
+  child.on("close", () => done(out));
+});
+if (!/"sent"/.test(mailJob)) {
+  console.error(`✗ mail job did not answer: ${mailJob.trim().slice(-200)}`);
   process.exit(1);
 }
 

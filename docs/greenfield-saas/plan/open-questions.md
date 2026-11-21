@@ -21,6 +21,22 @@ A brand is public, so generation is redundant work; tenant edits then collide. L
 reuse the generated row, scope edits to the org that made them, fall back on
 conflict.
 
+## Billing and ops questions
+
+### OPEN-BILL-08 — NowPayments IPN secret is not in `.env` (blocks live payments)
+
+The API key is present, so checkout mints invoices, but `/api/payments/ipn` refuses
+every callback without `NOWPAYMENTS_IPN_SECRET` and a payment never reaches
+`confirmed`. Paste the IPN secret from the NowPayments dashboard (Store → IPN) into
+`.env` and deploy; the field is already shipped as empty.
+
+### OPEN-OPS-07 — CI secrets for the db suites (blocks full CI)
+
+`.github/workflows/ci.yml` runs the gate, but without four repository secrets the
+db steps skip and only lint/typecheck/unit run. Needed: `DATABASE_URL_TEST`,
+`DATABASE_URL_TEST_APP_RW`, `DATABASE_URL_TEST_EDGE_RO`, `DATABASE_URL_TEST_ADMIN`,
+all pointed at the throwaway `dev` branch — never production.
+
 ## Service questions
 
 ### OPEN-SVC-01 — Does a downgrade keep the DEK and passcode? (blocks 9)
@@ -126,11 +142,18 @@ first 50KB.
 
 ## Billing questions
 
-### OPEN-BILL-01 — Use NowPayments' recurrence, or own the period loop? (blocks 9)
+### OPEN-BILL-01 — closed 2026-11-21: own loop (ADR 0026)
+
+Their recurrence is thin and cross-coin partials do not map onto it. Every period
+is an invoice we mint.
 
 Their recurrence is thin and partial payments across coins get messy. Lean: own loop.
 
-### OPEN-BILL-02 — Do billing calls hop through the Worker, or does the VPS hold a restricted key? (blocks 9)
+### OPEN-BILL-02 — closed 2026-11-21: the VPS holds the key
+
+The control plane calls NowPayments directly; the key is invoice-create only and
+lives in `/etc/chameleon/env` (0640 root:deploy). A Worker hop buys nothing while
+the VPS already holds the database DSN.
 
 The hop keeps keys off the VPS and adds a dependency. Lean: hop.
 
@@ -148,7 +171,10 @@ deadline only.
 
 Lean: no, skip the next invoice.
 
-### OPEN-BILL-06 — Combined or per-service invoices? (blocks 9)
+### OPEN-BILL-06 — closed 2026-11-21: per-service (ADR 0026)
+
+Every service is its own period and its own invoice. Combined billing can come
+later as a convenience, not as the data model.
 
 Lean: per service, since periods and tiers differ and partial cancel becomes a
 refund problem.
