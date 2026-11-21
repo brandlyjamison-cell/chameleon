@@ -2,6 +2,7 @@ import "server-only";
 import { requireDb } from "./db";
 import { forbidden } from "./errors";
 import type { PlatformSession } from "./session";
+import { listQueue, requeue, type QueueRow } from "./mailqueue";
 
 function assertAdmin(session: PlatformSession): void {
   if (!session.isAdmin) throw forbidden("admin_only");
@@ -133,4 +134,14 @@ export async function setNote(
 ): Promise<void> {
   assertAdmin(session);
   await requireDb().pool.query("select admin_set_note($1, $2)", [serviceId, note]);
+}
+
+export async function mailQueue(session: PlatformSession): Promise<QueueRow[]> {
+  assertAdmin(session);
+  return listQueue();
+}
+
+export async function retryQueued(session: PlatformSession, id: string): Promise<void> {
+  assertAdmin(session);
+  await requeue(id);
 }

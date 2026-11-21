@@ -17,6 +17,7 @@ export interface Outgoing {
 export interface DrainResult {
   sent: number;
   failed: number;
+  throttled: number;
 }
 
 interface QueuedRow {
@@ -59,8 +60,9 @@ export async function drain(limit = 20): Promise<DrainResult> {
   );
   let sent = 0;
   let failed = 0;
+  let throttled = 0;
   for (const row of rows) {
-    const ok = await sendMail({
+    const outcome = await sendMail({
       to: row.to_address,
       subject: row.subject,
       text: row.text_body,
@@ -69,12 +71,54 @@ export async function drain(limit = 20): Promise<DrainResult> {
     await requireDb()
       .pool.query("select finish_email($1, $2, $3)", [
         row.id,
-        ok,
-        ok ? null : "provider refused",
+        outcome,
+        outcome === "sent" ? null : "provider refused",
       ])
       .catch(() => undefined);
-    if (ok) sent += 1;
+    if (outcome === "sent") sent += 1;
+    else if (outcome === "throttled") throttled += 1;
     else failed += 1;
+    // Quota is account-wide: stop the batch instead of 429-ing every row.
+    if (outcome === "throttled") {
+      const rest = rows.slice(rows.indexOf(row) + 1);
+      for (const pending of rest) {
+        await requireDb()
+          .pool.query("select finish_email($1, 'throttled', $2)", [
+            pending.id,
+            "provider throttled",
+          ])
+          .catch(() => undefined);
+        throttled += 1;
+      }
+      break;
+    }
   }
-  return { sent, failed };
+  return { sent, failed, throttled };
+}
+
+export interface QueueRow {
+  id: string;
+  kind: string;
+  to_address: string;
+  subject: string;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  available_at: Date;
+  created_at: Date;
+  sent_at: Date | null;
+}
+
+export async function listQueue(limit = 100): Promise<QueueRow[]> {
+  const { rows } = await requireDb().pool.query<QueueRow>(
+    `select id, kind, to_address, subject, status, attempts, last_error,
+            available_at, created_at, sent_at
+     from email_queue order by id desc limit $1`,
+    [limit],
+  );
+  return rows;
+}
+
+export async function requeue(id: string): Promise<void> {
+  await requireDb().pool.query("select requeue_email($1)", [id]);
 }

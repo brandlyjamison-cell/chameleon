@@ -30,6 +30,18 @@ every callback without `NOWPAYMENTS_IPN_SECRET` and a payment never reaches
 `confirmed`. Paste the IPN secret from the NowPayments dashboard (Store → IPN) into
 `.env` and deploy; the field is already shipped as empty.
 
+### OPEN-MAIL-01 — Cloudflare Email Sending is throttling the account (blocks signup delivery)
+
+`429 10004` on every send since 2026-11-21 16:00 UTC, reproducible outside the
+app. Their docs admit new accounts start with a conservative daily quota and
+point at a limit-increase form. Until it clears, verification and receipt mail
+park in `email_queue` (throttles no longer burn the retry budget) and signup
+confirmation is delayed.
+
+Two tracks: submit the limit-increase form, and add a fallback provider
+(Resend/Postmark/SMTP) behind the same queue so one provider's quota cannot stop
+signups. Needs a provider account and key from the operator.
+
 ### OPEN-OPS-07 — CI secrets for the db suites (blocks full CI)
 
 `.github/workflows/ci.yml` runs the gate, but without four repository secrets the

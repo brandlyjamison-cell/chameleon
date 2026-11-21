@@ -70,6 +70,32 @@ describe.skipIf(!hasDb)("platform mail queue", () => {
     expect(after.rows[0]!.n).toBe(count.rows[0]!.n);
   });
 
+  it("parks a throttled row instead of spending its tries", async () => {
+    const created = await admin.query<{ id: string }>(
+      "select enqueue_email(null, 'system', 'park@example.test', 's', 't', null) as id",
+    );
+    const id = created.rows[0]!.id;
+    await admin.query("select claim_emails(100)");
+    await admin.query("select finish_email($1, 'throttled', 'provider refused')", [id]);
+
+    const row = await admin.query<{
+      status: string;
+      attempts: number;
+      available_at: Date;
+    }>("select status, attempts, available_at from email_queue where id = $1", [id]);
+    expect(row.rows[0]?.status).toBe("queued");
+    expect(row.rows[0]?.attempts).toBe(0);
+    const minutes = (row.rows[0]!.available_at.getTime() - Date.now()) / 60_000;
+    expect(minutes).toBeGreaterThan(13);
+
+    await admin.query("select requeue_email($1)", [id]);
+    const due = await admin.query<{ available_at: Date }>(
+      "select available_at from email_queue where id = $1",
+      [id],
+    );
+    expect(due.rows[0]!.available_at.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
   it("refuses the job without the token", async () => {
     const plain = await fetch("http://localhost:3100/api/jobs/mail", { method: "POST" });
     expect(plain.status).toBe(403);

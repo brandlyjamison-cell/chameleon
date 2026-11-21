@@ -14,7 +14,9 @@ export interface Mail {
   html?: string;
 }
 
-export async function sendMail(mail: Mail): Promise<boolean> {
+export type SendOutcome = "sent" | "throttled" | "failed";
+
+export async function sendMail(mail: Mail): Promise<SendOutcome> {
   const token = process.env.CLOUDFLARE_EMAIL_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;
   const from = process.env.MAIL_FROM ?? `noreply@${process.env.DOMAIN ?? "localhost"}`;
@@ -31,7 +33,7 @@ export async function sendMail(mail: Mail): Promise<boolean> {
     // With a sink present the message is as delivered as it needs to be: the
     // suite reads the sink, not an inbox.
     if (!sink) console.warn(`[mail] no provider, dropped: ${mail.subject} -> ${mail.to}`);
-    return Boolean(sink);
+    return sink ? "sent" : "failed";
   }
 
   try {
@@ -51,13 +53,19 @@ export async function sendMail(mail: Mail): Promise<boolean> {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
-      console.error(`[mail] ${res.status} ${await res.text()}`.slice(0, 400));
-      return false;
+      const body = (await res.text()).slice(0, 400);
+      // 10004 is a provider quota, not a bad message: park it, do not spend tries.
+      if (res.status === 429) {
+        console.warn(`[mail] throttled ${mail.to}`);
+        return "throttled";
+      }
+      console.error(`[mail] ${res.status} ${body}`.slice(0, 400));
+      return "failed";
     }
-    return true;
+    return "sent";
   } catch (error) {
     console.error("[mail]", (error as Error).message);
-    return false;
+    return "failed";
   }
 }
 

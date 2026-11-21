@@ -51,6 +51,12 @@ export default async function Admin() {
         </div>
       </div>
 
+      <p>
+        <a className="btn" href="/admin/mail">
+          Mail queue
+        </a>
+      </p>
+
       <h2>Services</h2>
       <div className="table">
         {services.map((service) => (

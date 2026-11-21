@@ -11,7 +11,9 @@ capture forwards all use it. `sendMail` is the transport, not the entry point.
 The worker is a 30-second systemd timer hitting `POST /api/jobs/mail` with the
 same shared job token as the domain sweep. Rows are claimed with
 `for update skip locked`, so two runs cannot send the same message. Failure
-backoff is 1, 2, 4 … 60 minutes, capped at six attempts, then `failed`. A restart
+backoff is 1, 2, 4 … 60 minutes, capped at six attempts, then `failed`. A provider
+`429` is different: it parks the row for 15 minutes and refunds the attempt, and
+the drain stops the batch because the quota is account-wide, not per message. A restart
 loses nothing because the queue is a table.
 
 Tenants can forward a capture only to the address on their account (proven by
