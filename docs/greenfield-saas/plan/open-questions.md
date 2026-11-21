@@ -226,6 +226,11 @@ while the schema and docs describe the product.
 
 `65.98.5.195` (Verpex). Vault calls are one crossing, not two; revisit at 20 tenants.
 
+### OPEN-OPS-06 — closed 2026-11-21: Workers Paid is on
+
+Durable Objects (rate limiting) and Queues are unblocked; Browser Rendering at
+stage 8 too. The zone stays Free until Pro for SaaS.
+
 ### OPEN-OPS-04 — Cloudflare for SaaS is not provisioned (blocks 4)
 
 The zone `mailerdeaon.bid` is active on the Free plan. `/zones/:id/custom_hostnames`
@@ -234,8 +239,8 @@ zone has no active core subscription, so Cloudflare for SaaS cannot be enabled
 until the zone is at least Pro. Workers Paid is a separate need for Queues,
 Durable Objects and Browser Rendering (stages 6-9). Everything else is reachable
 with the current token. Lean: Pro before the first custom-hostname attach, Workers
-Paid before stage 6. Operator could not upgrade on 2026-11-21, so stage 4 shipped
-without it: a proven TXT sits at `verifying` with `cf_entitlement_missing` and
+Paid before stage 6. Operator could not upgrade on 2026-11-21 and took Workers Paid
+instead, so stage 4 shipped without it: a proven TXT sits at `verifying` with `cf_entitlement_missing` and
 promotes by itself once quota exists.
 
 ### OPEN-OPS-05 — mailcow shares the box and owns 80/443 (blocks deploy)

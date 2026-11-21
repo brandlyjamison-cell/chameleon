@@ -1,6 +1,7 @@
 import { EmailSchema } from "@chameleon/contracts";
 import { auth } from "../../../../server/auth";
 import { seeOther } from "../../../../server/respond";
+import { currentSession } from "../../../../server/session";
 
 export async function POST(req: Request): Promise<Response> {
   const form = Object.fromEntries(await req.formData());
@@ -9,5 +10,8 @@ export async function POST(req: Request): Promise<Response> {
   await auth.api.sendVerificationEmail({
     body: { email: email.data, callbackURL: "/welcome" },
   });
-  return seeOther("/welcome?sent=1");
+  // Logged out (a sign-in attempt that bounced) still needs somewhere to land.
+  return (await currentSession())
+    ? seeOther("/welcome?sent=1")
+    : seeOther("/login?sent=1");
 }

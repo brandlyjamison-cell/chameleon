@@ -8,7 +8,7 @@
  * Needs .env: Server_IP, DEPLOY_USER, DOMAIN, and the key at ~/.ssh/chameleon_deploy.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { platform } from "node:os";
 import { resolve } from "node:path";
 
@@ -19,6 +19,21 @@ for (const file of [".env", ".env.db"]) {
     // optional
   }
 }
+
+/** `.env.prod` is parsed separately: the local gate must keep running on dev. */
+function readEnvFile(file) {
+  const out = {};
+  try {
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line.trim());
+      if (match) out[match[1]] = match[2].replace(/^['"]|['"]$/g, "");
+    }
+  } catch {
+    // optional
+  }
+  return out;
+}
+const prodDbUrl = readEnvFile(".env.prod").DATABASE_URL_APP_RW;
 
 const host = process.env.Server_IP;
 // `Username` collides with the Windows USERNAME variable, so DEPLOY_USER wins.
@@ -82,6 +97,8 @@ async function ship(dir, remote = "/srv/chameleon.stage") {
 }
 
 console.log(`→ deploy to ${domain} (${target})`);
+if (!prodDbUrl) throw new Error("DATABASE_URL_APP_RW missing in .env.prod");
+console.log(`→ db ${new URL(prodDbUrl).hostname} (production)`);
 
 if (process.argv.includes("--skip-gate")) {
   console.log("→ gate (skipped)");
@@ -101,12 +118,15 @@ await ssh(
     input: [
       "NODE_ENV=production",
       "PORT=3000",
-      `DATABASE_URL=${(process.env.DATABASE_URL_APP_RW ?? "").replace("sslmode=require", "sslmode=verify-full")}`,
+      `DATABASE_URL=${prodDbUrl.replace("sslmode=require", "sslmode=verify-full")}`,
       `BETTER_AUTH_SECRET=${process.env.BETTER_AUTH_SECRET ?? ""}`,
       `BETTER_AUTH_URL=https://app.${domain}`,
       `JOBS_TOKEN=${process.env.JOBS_TOKEN ?? ""}`,
       `CLOUDFLARE_ZONE_ID=${process.env.CLOUDFLARE_ZONE_ID ?? ""}`,
       `CLOUDFLARE_API_KEY=${process.env.CLOUDFLARE_API_KEY ?? ""}`,
+      `CLOUDFLARE_ACCOUNT_ID=${process.env.CLOUDFLARE_ACCOUNT_ID ?? ""}`,
+      `CLOUDFLARE_EMAIL_API_TOKEN=${process.env.CLOUDFLARE_EMAIL_API_TOKEN ?? ""}`,
+      `MAIL_FROM=${process.env.MAIL_FROM ?? `noreply@${domain}`}`,
       "",
     ].join("\n"),
   },

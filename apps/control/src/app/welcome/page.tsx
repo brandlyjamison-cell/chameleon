@@ -12,7 +12,7 @@ export default async function Welcome({
   const { sent } = await searchParams;
 
   return (
-    <>
+    <main className="app" id="content">
       <h1>One more step</h1>
       {session.emailVerified ? (
         <>
@@ -43,9 +43,9 @@ export default async function Welcome({
         </>
       )}
       <p className="muted">
-        In this build the verification link is printed by the control process. SMTP lands
-        with the mailbox provider.
+        The link is valid for 24 hours. If it never arrives, resend it above and check the
+        spam folder.
       </p>
-    </>
+    </main>
   );
 }

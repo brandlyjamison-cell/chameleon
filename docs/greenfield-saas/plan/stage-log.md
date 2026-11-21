@@ -110,3 +110,26 @@ DEFINER` owned by the bypassing role and adds two lookup functions (ADR 0025).
 Blocked on the operator: the Cloudflare for SaaS entitlement itself
 (`OPEN-OPS-04`). Everything above works without it — rows simply stop at
 `verifying` with the TXT proven, and promote by themselves once quota exists.
+
+## Post-stage-4 fixes — 2026-11-21
+
+The operator's first real signup vanished. Cause: the host and the local suite
+were on the **same** Neon branch (`ep-proud-field`, `dev`), so every `reset()` in
+the gate deleted live accounts. The project already had a `production` branch; it
+is now bootstrapped, migrated and the only one the deploy ships, from `.env.prod`.
+The suite stays on `dev` (`DATABASE_URL_TEST`), so the gate can keep truncating.
+
+Also fixed in this pass:
+
+- Verification mail now leaves through Cloudflare Email Service (`mail.ts`), with
+  the sink kept for tests. Provider failures warn instead of breaking signup.
+- `requirePageSession()` redirects to `/login` instead of throwing 401 at a page,
+  which is what the generic error page was: the operator hit `/services` with a
+  dead session.
+- Login distinguishes an unconfirmed address from a wrong password and offers a
+  resend with the address already filled in.
+- Landing page rebuilt on a real design system (dark, mint accent, Inter +
+  JetBrains Mono, bento product preview); app pages inherit the same tokens. Auth
+  pages, 404 and the shell carry it too.
+- `x-robots-tag: noindex` on everything behind the login; `x-frame-options` and a
+  permissions policy everywhere. HSTS/nosniff/referrer stay in Caddy, once.

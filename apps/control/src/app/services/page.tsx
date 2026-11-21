@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
-import { requireSession } from "../../server/session";
+import { requirePageSession } from "../../server/session";
 import { listServices } from "../../server/services";
 
 export default async function Services() {
-  const session = await requireSession();
+  const session = await requirePageSession();
   if (!session.orgId) redirect("/welcome");
   const services = await listServices(session);
 
   return (
-    <>
+    <main className="app" id="content">
       <h1>Services</h1>
       <p className="muted">
         Each service is one capture surface: its own links, domains and vault.
@@ -34,6 +34,6 @@ export default async function Services() {
       <p>
         <a href="/services/new">Create a service</a>
       </p>
-    </>
+    </main>
   );
 }

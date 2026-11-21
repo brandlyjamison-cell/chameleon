@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import pg from "pg";
 
-const [, , ownerUri, label] = process.argv;
+const [, , ownerUri, label, outFile] = process.argv;
 if (!ownerUri || !label) throw new Error("usage: bootstrap-roles <owner-uri> <label>");
 
 const ROLES = [
@@ -79,5 +79,9 @@ if (label === "dev") {
   lines.push(`DATABASE_URL_TEST='${urlFor("app_migrator")}'`);
   lines.push(`DATABASE_URL_DEV_OWNER='${ownerUri}'`);
 }
-writeFileSync(new URL("../../../.env.db", import.meta.url), `${lines.join("\n")}\n`);
+// Third argument lets production write somewhere other than .env.db.
+const target = outFile
+  ? new URL(`file:///${outFile.replace(/\\/g, "/")}`)
+  : new URL("../../../.env.db", import.meta.url);
+writeFileSync(target, `${lines.join("\n")}\n`);
 process.stdout.write(`roles ready (${label})\n`);
