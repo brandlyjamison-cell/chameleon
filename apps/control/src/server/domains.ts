@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { withTenant, type Ctx } from "@chameleon/db";
 import * as domains from "@chameleon/db";
-import { requireDb } from "./db";
+import { asTenant, requireDb } from "./db";
 import { hasMatch, lookupTxt, txtName, txtValue } from "./dns";
 import { CfUnavailable, createCustomHostname, getCustomHostname } from "./cloudflare";
 import { conflict, forbidden, invalid, notFound } from "./errors";
@@ -81,10 +81,15 @@ export async function requestDomain(ctx: Ctx, serviceId: string, raw: string) {
   });
 }
 
-/** The row plus the record the tenant must publish; both derived, never stored. */
+/** Where a live tenant host must point. Fixed per platform, not per tenant. */
+export function routingTarget(): string {
+  return process.env.EDGE_CNAME_TARGET ?? "edge.mailerdeaon.bid";
+}
+
+/** The row plus the records the tenant must publish; both derived, never stored. */
 export function domainView(
-  row: domains.domains.DomainRow & { last_checked_at?: Date | null },
-  detail: string | null = null,
+  row: domains.domains.DomainRow,
+  detail: string | null = row.last_detail ?? null,
 ): DomainView {
   return {
     id: row.id,
@@ -92,8 +97,16 @@ export function domainView(
     status: row.status,
     verifyName: txtName(row.hostname),
     verifyValue: txtValue(row.verify_token),
+    recordType: "TXT",
+    ttl: 300,
+    routing: {
+      type: "CNAME",
+      name: row.hostname,
+      value: routingTarget(),
+    },
     detail,
     checkedAt: row.last_checked_at ? row.last_checked_at.toISOString() : null,
+    lastResult: (row.last_result as DomainView["lastResult"]) ?? null,
   };
 }
 
@@ -110,7 +123,7 @@ export interface CheckResult {
 export async function checkDomain(ctx: Ctx, id: string): Promise<CheckResult> {
   requireOwner(ctx);
   return withTenant(requireDb(), ctx, async (c) => {
-    const row = await domains.domains.beginVerify(c, id);
+    const row = await domains.domains.beginVerify(c, id, ctx.orgId);
 
     const name = txtName(row.hostname);
     let records: string[];
@@ -198,6 +211,11 @@ export async function runJob(): Promise<{
     c.release();
   }
 
+  // Lifecycle follows money: a lapsed service stops being renderable.
+  await requireDb()
+    .pool.query("select sweep_services()")
+    .catch(() => undefined);
+
   let checked = 0;
   let failed = 0;
   for (const row of due) {
@@ -219,3 +237,54 @@ export async function enforceLiveLimit(): Promise<number> {
 }
 
 export { forbidden };
+
+export interface DomainIssue {
+  id: string;
+  hostname: string;
+  status: string;
+  serviceId: string;
+  detail: string | null;
+}
+
+/** Hosts the tenant must act on: failed checks, or a mismatch on a live host. */
+export async function troubleDomains(ctx: Ctx): Promise<DomainIssue[]> {
+  return asTenant(ctx, async (c) => {
+    const { rows } = await c.query<DomainIssue>(
+      `select d.id, d.hostname, d.status, d.service_id as "serviceId",
+              (select detail from domain_checks where domain_id = d.id
+                order by created_at desc limit 1) as detail
+         from domains d
+        where d.deleted_at is null and d.status in ('failed', 'verifying')
+          and d.last_checked_at is not null
+        order by d.last_checked_at desc limit 5`,
+    );
+    return rows;
+  });
+}
+
+export interface OrgDomainRow extends DomainView {
+  serviceId: string;
+  serviceType: string;
+}
+
+/** Every host on the org, for the configuration centre. */
+export async function listOrgDomains(ctx: Ctx): Promise<OrgDomainRow[]> {
+  return asTenant(ctx, async (c) => {
+    const { rows } = await c.query<
+      domains.domains.DomainRow & {
+        service_type: string;
+        service_id: string;
+      }
+    >(
+      `select d.*, st.code as service_type from domains d
+         join services s on s.id = d.service_id
+         join service_types st on st.id = s.service_type_id
+        where d.deleted_at is null order by d.created_at desc`,
+    );
+    return rows.map((row) => ({
+      ...domainView(row),
+      serviceId: row.service_id,
+      serviceType: row.service_type,
+    }));
+  });
+}

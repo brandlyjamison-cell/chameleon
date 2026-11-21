@@ -150,16 +150,49 @@ export async function latestPayment(
   });
 }
 
+const HEX_128 = /^[a-f0-9]{128}$/i;
+
 /** HMAC-SHA512 over the raw body with keys sorted, as NowPayments signs it. */
 export function validSignature(raw: string, signature: string | null): boolean {
   const secret = process.env.NOWPAYMENTS_IPN_SECRET;
-  if (!secret) return false;
-  if (!signature) return false;
-  const sorted = JSON.stringify(sortKeys(JSON.parse(raw)));
-  const expected = createHmac("sha512", secret).update(sorted).digest("hex");
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signature.toLowerCase());
-  return a.length === b.length && timingSafeEqual(a, b);
+  if (!secret || !signature || !HEX_128.test(signature)) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  const sorted = JSON.stringify(sortKeys(parsed));
+  const expected = createHmac("sha512", secret).update(sorted).digest();
+  const given = Buffer.from(signature, "hex");
+  return given.length === expected.length && timingSafeEqual(expected, given);
+}
+
+interface ProviderPayment {
+  status: string;
+  priceAmount: number;
+}
+
+/**
+ * NowPayments is the authority, not the callback body (INV-SEC-05). A callback
+ * that cannot be checked against the API is retried rather than trusted.
+ */
+async function fetchProviderPayment(paymentId: string): Promise<ProviderPayment | null> {
+  const key = process.env.NOWPAYMENTS_API_KEY;
+  if (!key) return null;
+  const res = await fetch(`${API}/payment/${encodeURIComponent(paymentId)}`, {
+    headers: { "x-api-key": key },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    payment_status?: string;
+    status?: string;
+    price_amount?: number | string;
+  };
+  const status = data.payment_status ?? data.status;
+  if (!status) return null;
+  return { status, priceAmount: Number(data.price_amount ?? 0) };
 }
 
 function sortKeys(value: unknown): unknown {
@@ -190,13 +223,37 @@ export async function handleIpn(
   if (!validSignature(raw, signature)) throw forbidden("bad_signature");
   const body = JSON.parse(raw) as {
     payment_status?: string;
-    invoice_id?: string | number;
-    payment_id?: string | number;
+    invoice_id?: string | number | null;
+    payment_id?: string | number | null;
     order_id?: string;
   };
-  const status = body.payment_status;
   const providerId = String(body.invoice_id ?? body.payment_id ?? "");
-  if (!status || !providerId) throw invalid("bad_ipn");
+  const paymentId = String(body.payment_id ?? body.invoice_id ?? "");
+  if (!providerId || !paymentId) throw invalid("bad_ipn");
+
+  // No tenant GUC on an IPN: the lookup is a definer function.
+  const { rows: local } = await requireDb().pool.query<{ payment_price: number | null }>(
+    "select payment_price($1)",
+    [providerId],
+  );
+  const expectedCents = local[0]?.payment_price;
+  if (!expectedCents) return { status: "unknown", serviceId: null };
+
+  const provider = await fetchProviderPayment(paymentId);
+  // 500 here is deliberate: the provider retries, and nothing is credited blind.
+  if (!provider) throw new Error("payment status unavailable");
+
+  // A finished payment worth less than the snapshot buys a hold, not a period.
+  let effective = provider.status;
+  if (
+    effective === "finished" &&
+    Math.abs(provider.priceAmount * 100 - expectedCents) > 1
+  ) {
+    console.warn(
+      `[billing] price mismatch ${providerId}: ${provider.priceAmount} vs ${expectedCents / 100}`,
+    );
+    effective = "partially_paid";
+  }
 
   const { rows } = await requireDb().pool.query<{
     service_id: string;
@@ -204,7 +261,7 @@ export async function handleIpn(
     fresh: boolean;
   }>("select * from apply_payment_status($1, $2, $3)", [
     providerId,
-    status,
+    effective,
     JSON.stringify(body),
   ]);
   const result = {

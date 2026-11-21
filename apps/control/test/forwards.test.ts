@@ -104,6 +104,52 @@ describe.skipIf(!hasDb)("platform mail queue", () => {
     expect(due.rows[0]!.available_at.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
+  it("reclaims a row whose worker died mid-send", async () => {
+    const s = await signUp();
+    const id = (
+      await admin.query<{ id: string }>(
+        `insert into email_queue (org_id, kind, to_address, subject, text_body, status, attempts, claimed_at)
+         values ($1, 'system', 'stuck@example.test', 'stuck', 'body', 'sending', 1, now() - interval '9 minutes')
+         returning id`,
+        [s.orgId],
+      )
+    ).rows[0]!.id;
+
+    const claimed = await admin.query<{ id: string; attempts: number }>(
+      "select id, attempts from claim_emails(50)",
+    );
+    const row = claimed.rows.find((r) => r.id === id);
+    expect(row).toBeTruthy();
+    expect(row?.attempts).toBe(2);
+  });
+
+  it("reports backlog depth and scopes the tenant view", async () => {
+    const a = await signUp();
+    const b = await signUp(false);
+    await admin.query(
+      `insert into email_queue (org_id, kind, to_address, subject, text_body)
+       values ($1, 'system', 'visible@example.test', 'visible', 'body')`,
+      [a.orgId],
+    );
+    const stats = await admin.query<{ queued: string }>(
+      "select queued from mail_stats()",
+    );
+    expect(Number(stats.rows[0]?.queued)).toBeGreaterThan(0);
+
+    const own = await admin.query<{ to_address: string }>(
+      "select to_address from email_queue where org_id = $1",
+      [a.orgId],
+    );
+    expect(own.rows.some((r) => r.to_address === "visible@example.test")).toBe(true);
+
+    const other = await admin.query<{ to_address: string }>(
+      "select to_address from email_queue where org_id <> $1 and to_address = 'visible@example.test'",
+      [a.orgId],
+    );
+    expect(other.rows).toHaveLength(0);
+    expect(b.orgId).not.toBe(a.orgId);
+  });
+
   it("reads tenant tables with an empty app.org_id", async () => {
     // A pooled session can carry the GUC as ''; the policy nulls it instead of
     // casting '' to uuid and throwing.

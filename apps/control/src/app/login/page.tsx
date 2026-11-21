@@ -6,50 +6,55 @@ export default async function Login({
 }: {
   searchParams: Promise<{ error?: string; sent?: string; email?: string }>;
 }) {
-  if (await currentSession()) redirect("/services");
+  if (await currentSession()) redirect("/dashboard");
   const { error, sent, email } = await searchParams;
   return (
     <main className="auth" id="content">
       <h1>Sign in</h1>
-      <p className="hint">
+      <p className="fine" style={{ marginBottom: "1.2rem" }}>
         Use the address and password you signed up with. Sessions end after 30 idle
         minutes.
       </p>
-      {sent && <p className="muted">Sent. Check the inbox and the spam folder.</p>}
-      {error && (
-        <p className="error">
+      {sent ? <p className="ok">Sent. Check the inbox and the spam folder.</p> : null}
+      {error ? (
+        <p className="error" role="alert">
           {error === "unverified"
-            ? "That address is not confirmed yet — check your inbox, or sign in and resend."
-            : "Wrong email or password."}
+            ? "That address is not confirmed yet — check your inbox, or resend below."
+            : error === "rate_limited"
+              ? "Too many attempts. Wait a few minutes."
+              : "Wrong email or password."}
         </p>
-      )}
+      ) : null}
       <div className="card">
         <form action="/api/login" method="post">
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
-            Password
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" autoComplete="email" required />
+          </div>
+          <div className="field">
+            <label htmlFor="password">Password</label>
             <input
+              id="password"
               name="password"
               type="password"
               autoComplete="current-password"
               required
             />
-          </label>
-          <button type="submit">Sign in</button>
-        </form>
-      </div>
-      {error === "unverified" && email && (
-        <form action="/api/verify/resend" method="post">
-          <input type="hidden" name="email" value={email} />
-          <button type="submit" className="link">
-            Resend the confirmation to {email}
+          </div>
+          <button type="submit" className="btn block">
+            Sign in
           </button>
         </form>
-      )}
-      <p className="foot">
+        {error === "unverified" && email ? (
+          <form action="/api/verify/resend" method="post" style={{ marginTop: "0.8rem" }}>
+            <input type="hidden" name="email" value={email} />
+            <button type="submit" className="link">
+              Resend the confirmation to {email}
+            </button>
+          </form>
+        ) : null}
+      </div>
+      <p className="fine" style={{ marginTop: "1rem" }}>
         No account? <a href="/signup">Create one</a>.
       </p>
     </main>

@@ -44,6 +44,10 @@ export interface ServiceView {
   createdAt: string;
   paidUntil: string | null;
   priceCents: number;
+  linkCap: number;
+  domainCap: number;
+  linksUsed: number;
+  domainsUsed: number;
 }
 
 export const SERVICE_VIEW_FIELDS = [
@@ -64,13 +68,20 @@ export const DomainSchema = z.object({
   hostname: z.string().trim().min(4).max(253),
 });
 
-/** What a tenant needs to publish the TXT record and read the state. */
+/**
+ * Every field the tenant must publish, plus enough state to explain a failure.
+ * `routing` is null while the SaaS entitlement is missing (OPEN-OPS-04).
+ */
 export interface DomainView {
   id: string;
   hostname: string;
   status: string;
   verifyName: string;
   verifyValue: string;
+  recordType: "TXT";
+  ttl: 300;
+  routing: { type: "CNAME"; name: string; value: string } | null;
   detail: string | null;
   checkedAt: string | null;
+  lastResult: "match" | "mismatch" | "error" | null;
 }

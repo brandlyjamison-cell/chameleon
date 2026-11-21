@@ -22,6 +22,10 @@ export interface ServiceView {
   createdAt: string;
   paidUntil: string | null;
   priceCents: number;
+  linkCap: number;
+  domainCap: number;
+  linksUsed: number;
+  domainsUsed: number;
 }
 
 // Aliases are quoted because the view is camelCase and the row goes straight out.
@@ -29,7 +33,9 @@ const VIEW_SQL = `
   select s.id, s.status, st.code as "serviceType", t.code as tier,
          s.gate_mode as "gateMode", s.expires_at as "expiresAt",
          s.activated_at as "activatedAt", s.created_at as "createdAt",
-         s.paid_until as "paidUntil", t.price_cents as "priceCents"
+         s.paid_until as "paidUntil", t.price_cents as "priceCents",
+         t.link_cap as "linkCap", t.domain_cap as "domainCap",
+         s.link_slots_used as "linksUsed", s.domain_slots_used as "domainsUsed"
   from services s
   join service_types st on st.id = s.service_type_id
   join tiers t on t.id = s.tier_id`;

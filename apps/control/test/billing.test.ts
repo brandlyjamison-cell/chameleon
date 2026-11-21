@@ -6,6 +6,7 @@ import {
   createService,
   ipn,
   pay,
+  providerSays,
   sentInvoices,
   signUp,
   verify,
@@ -97,6 +98,7 @@ describe.skipIf(!hasDb)("billing gate (acceptance 8)", () => {
     const replay = await ipn({
       payment_status: "finished",
       invoice_id: row.rows[0]!.provider_payment_id,
+      payment_id: `pay_${row.rows[0]!.provider_payment_id}`,
     });
     expect(replay.status).toBe(200);
     const after = await admin.query<{ paid_until: Date }>(
@@ -104,6 +106,88 @@ describe.skipIf(!hasDb)("billing gate (acceptance 8)", () => {
       [id],
     );
     expect(after.rows[0]!.paid_until.getTime()).toBe(first.getTime());
+  });
+
+  it("holds on `confirmed` until the funds are `finished`", async () => {
+    const { s, id } = await verifiedOwner();
+    const before = (await sentInvoices()).length;
+    const checkout = await s.jar.post(`/api/services/${id}/checkout`);
+    expect(checkout.status).toBe(303);
+    const provider = `inv_${before + 1}`;
+    await providerSays(`pay_${provider}`, "confirmed");
+
+    const early = await ipn({
+      payment_status: "confirmed",
+      invoice_id: provider,
+      payment_id: `pay_${provider}`,
+    });
+    expect(early.status).toBe(200);
+    const held = await admin.query<{ status: string; paid_until: Date | null }>(
+      "select p.status, s.paid_until from payments p join services s on s.id = p.service_id where p.provider_payment_id = $1",
+      [provider],
+    );
+    expect(held.rows[0]?.status).toBe("confirming");
+    expect(held.rows[0]?.paid_until).toBeNull();
+
+    const blocked = await activate(s.jar, id, undefined, { pay: false });
+    expect(blocked.headers.get("location")).toContain("error=payment_required");
+
+    await providerSays(`pay_${provider}`, "finished");
+    const done = await ipn({
+      payment_status: "finished",
+      invoice_id: provider,
+      payment_id: `pay_${provider}`,
+    });
+    expect(done.status).toBe(200);
+    const activated = await activate(s.jar, id, undefined, { pay: false });
+    expect(activated.headers.get("location")).toContain("activated=1");
+  });
+
+  it("refuses to credit when the provider reports a lower price", async () => {
+    const { s, id } = await verifiedOwner();
+    const before = (await sentInvoices()).length;
+    await s.jar.post(`/api/services/${id}/checkout`);
+    const invoice = (await sentInvoices())[before] as {
+      order_id: string;
+      price_amount: number;
+    };
+    const provider = `inv_${before + 1}`;
+    await providerSays(`pay_${provider}`, "finished", invoice.price_amount - 5);
+
+    await ipn({
+      payment_status: "finished",
+      invoice_id: provider,
+      payment_id: `pay_${provider}`,
+    });
+    const row = await admin.query<{ status: string; paid_until: Date | null }>(
+      "select p.status, s.paid_until from payments p join services s on s.id = p.service_id where p.provider_payment_id = $1",
+      [provider],
+    );
+    expect(row.rows[0]?.status).toBe("confirming");
+    expect(row.rows[0]?.paid_until).toBeNull();
+  });
+
+  it("retries instead of crediting when the status API is down", async () => {
+    const { s, id } = await verifiedOwner();
+    const before = (await sentInvoices()).length;
+    await s.jar.post(`/api/services/${id}/checkout`);
+    const provider = `inv_${before + 1}`;
+    await providerSays(`pay_${provider}`, null);
+
+    const down = await ipn({
+      payment_status: "finished",
+      invoice_id: provider,
+      payment_id: `pay_${provider}`,
+    });
+    expect(down.status).toBe(500);
+
+    await providerSays(`pay_${provider}`, "finished");
+    const recovered = await ipn({
+      payment_status: "finished",
+      invoice_id: provider,
+      payment_id: `pay_${provider}`,
+    });
+    expect(recovered.status).toBe(200);
   });
 
   it("keeps an unpaid renewal visible instead of extending twice", async () => {
@@ -131,7 +215,7 @@ describe.skipIf(!hasDb)("admin panel", () => {
     const s = await signUp();
     const denied = await s.jar.get("/admin");
     expect(denied.status).toBe(307);
-    expect(denied.headers.get("location")).toBe("/services");
+    expect(denied.headers.get("location")).toBe("/dashboard");
 
     await admin.query("update users set is_admin = true where id = $1", [s.userId]);
     const page = await s.jar.get("/admin");

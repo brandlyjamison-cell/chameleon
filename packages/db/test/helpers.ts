@@ -37,7 +37,7 @@ export async function disconnect(): Promise<void> {
 
 export async function reset(): Promise<void> {
   await migrator.query(
-    "truncate auth_session, auth_verification, auth_account, auth_user, orgs, users, brands, audit_log, outbox, idempotency, webhook_events restart identity cascade",
+    "truncate auth_session, auth_verification, auth_account, auth_user, orgs, users, brands, audit_log, outbox, idempotency, webhook_events, rate_limits restart identity cascade",
   );
   await migrator.query(
     `update tiers set link_cap = 5, domain_cap = 2, capture_cap = 50000 where id in (1, 3)`,

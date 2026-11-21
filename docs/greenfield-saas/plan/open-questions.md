@@ -27,8 +27,17 @@ conflict.
 
 The API key is present, so checkout mints invoices, but `/api/payments/ipn` refuses
 every callback without `NOWPAYMENTS_IPN_SECRET` and a payment never reaches
-`confirmed`. Paste the IPN secret from the NowPayments dashboard (Store → IPN) into
-`.env` and deploy; the field is already shipped as empty.
+`confirmed`.
+
+The IPN secret is a second credential, not the API key, and it is not returned by
+any API call. Steps in the NowPayments dashboard: log in → **Store settings** →
+**IPN** → set the callback URL to `https://app.mailerdeaon.bid/api/payments/ipn` →
+copy the generated **IPN secret key** → paste it into `.env` as
+`NOWPAYMENTS_IPN_SECRET=` → deploy. Without a secret NowPayments sends nothing at
+all, so an empty value looks like silence rather than an error.
+
+The handler then verifies the HMAC, re-reads the payment from the provider API and
+credits only a `finished` payment at the stored price (ADR 0029).
 
 ### OPEN-MAIL-01 — Cloudflare Email Sending is throttling the account (blocks signup delivery)
 
