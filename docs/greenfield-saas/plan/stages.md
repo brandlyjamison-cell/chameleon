@@ -96,7 +96,7 @@ Invariants: INV-SEC-02, INV-DATA-06/07, INV-OPS-02.
 
 ---
 
-## Stage 4 — Domains
+## Stage 4 — Domains — code done 2026-11-21, entitlement pending
 
 Goal: a tenant can prove a hostname and get TLS.
 

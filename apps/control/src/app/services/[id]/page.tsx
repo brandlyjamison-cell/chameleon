@@ -1,21 +1,37 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { NotFoundError } from "@chameleon/db";
 import { requireSession } from "../../../server/session";
 import { getService } from "../../../server/services";
+import {
+  checkDomain,
+  listDomains,
+  removeDomain,
+  requestDomain,
+} from "../../../server/domains";
 
 const errors: Record<string, string> = {
   email_unverified: "Verify your email before activating this service.",
   passcode_mismatch: "A passcode is already set with a different value.",
   invalid_input: "Passcode needs 10+ characters with a letter and a digit.",
-  owner_only: "Only the owner can activate.",
+  owner_only: "Only the org owner can do that.",
+  bad_hostname: "That is not a hostname (no scheme, no path).",
+  domain_exists: "That hostname is already attached here.",
+  domain_tombstoned: "Another org used that hostname in the last 30 days.",
+  cap: "No domain slots left on this tier.",
+  zone_full: "The platform is at its live-domain ceiling.",
+  not_found: "That domain is gone.",
 };
+
+function codeOf(error: unknown): string {
+  return (error as { code?: string }).code ?? "not_found";
+}
 
 export default async function ServiceDetail({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; activated?: string }>;
+  searchParams: Promise<{ error?: string; activated?: string; domain_added?: string }>;
 }) {
   const { id } = await params;
   const session = await requireSession();
@@ -26,7 +42,7 @@ export default async function ServiceDetail({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
-  const { error, activated } = await searchParams;
+  const { error, activated, domain_added } = await searchParams;
   const live =
     service.status === "active" &&
     service.expiresAt !== null &&
@@ -38,6 +54,9 @@ export default async function ServiceDetail({
       <p className="muted">{service.id}</p>
       {error && <p className="error">{errors[error] ?? "That did not work."}</p>}
       {activated && <p className="muted">Activated. The 30-day clock is running.</p>}
+      {domain_added && (
+        <p className="muted">Hostname added. Publish the TXT record, then check.</p>
+      )}
 
       <div className="card">
         <div className="row">
@@ -98,12 +117,91 @@ export default async function ServiceDetail({
         </>
       )}
 
-      {service.activatedAt && (
-        <p className="muted">
-          Links and domains arrive in the next stage; the vault surface is behind the edge
-          worker.
-        </p>
-      )}
+      {service.activatedAt && <Domains id={service.id} session={session} />}
     </>
+  );
+}
+
+async function Domains({
+  id,
+  session,
+}: {
+  id: string;
+  session: Awaited<ReturnType<typeof requireSession>>;
+}) {
+  const domains = await listDomains(session, id);
+
+  async function addDomain(formData: FormData) {
+    "use server";
+    const ctx = await requireSession();
+    try {
+      await requestDomain(ctx, id, String(formData.get("hostname") ?? ""));
+    } catch (error) {
+      redirect(`/services/${id}?error=${codeOf(error)}`);
+    }
+    redirect(`/services/${id}?domain_added=1#domains`);
+  }
+
+  async function verifyDomain(formData: FormData) {
+    "use server";
+    const ctx = await requireSession();
+    try {
+      await checkDomain(ctx, String(formData.get("domainId") ?? ""));
+    } catch (error) {
+      redirect(`/services/${id}?error=${codeOf(error)}#domains`);
+    }
+    redirect(`/services/${id}#domains`);
+  }
+
+  async function deleteDomain(formData: FormData) {
+    "use server";
+    const ctx = await requireSession();
+    try {
+      await removeDomain(ctx, String(formData.get("domainId") ?? ""));
+    } catch (error) {
+      redirect(`/services/${id}?error=${codeOf(error)}#domains`);
+    }
+    redirect(`/services/${id}#domains`);
+  }
+
+  return (
+    <section id="domains">
+      <h2>Domains</h2>
+      <p className="muted">
+        A tenant hostname needs one TXT record, then TLS is issued for it. Verification
+        retries every five minutes for 72 hours.
+      </p>
+      {domains.length === 0 && <p className="muted">No hostnames yet.</p>}
+      {domains.map((domain) => (
+        <div className="card" key={domain.id}>
+          <div className="row">
+            <strong>{domain.hostname}</strong>
+            <span>{domain.status}</span>
+          </div>
+          <p className="muted">
+            Publish <code>{domain.verifyValue}</code> as a TXT record at{" "}
+            <code>{domain.verifyName}</code>.
+          </p>
+          {domain.detail && <p className="muted">{domain.detail}</p>}
+          <div className="row">
+            <form action={verifyDomain}>
+              <input type="hidden" name="domainId" value={domain.id} />
+              <button type="submit">Check now</button>
+            </form>
+            <form action={deleteDomain}>
+              <input type="hidden" name="domainId" value={domain.id} />
+              <button type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+      ))}
+      <form action={addDomain}>
+        <label>
+          Hostname
+          <input name="hostname" placeholder="login.acme.com" required />
+        </label>
+        <button type="submit">Add hostname</button>
+      </form>
+    </section>
   );
 }

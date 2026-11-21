@@ -74,3 +74,39 @@ Notes and deviations:
 
 Deferred: SMTP delivery, passkey list/delete UI, passcode reset (needs the old
 passcode until then), admin panel, VPS deploy (see `OPEN-OPS-05`).
+
+## Stage 4 — code complete 2026-11-21
+
+Shipped: hostname add/list/check/delete (`/api/services/:id/domains`,
+`/api/domains/:id`, `/api/domains/:id/check`), the Domains panel on the service
+page, DoH TXT checking, tombstone and live-name conflict handling across orgs, the
+72-hour expiry, the token-guarded `/api/jobs/domains` route, and a systemd timer
+that drives it every five minutes.
+
+Gate proves (11 new tests, 61 total): TXT handed over on create and never the
+stored token, bare label refused and a full URL normalised, wrong TXT stays
+`verifying` and records a `mismatch`, TXT proven but `cf_entitlement_missing`
+leaves the row `verifying` with `verified_at` written, `active` only when
+Cloudflare reports the hostname active, direct UPDATE to `active` refused by the
+trigger, delete tombstones other orgs for 30 days while the same org revives with
+its token, third host on starter is `409 domain_slots_exhausted`, a foreign domain
+is `404` on delete and on check and never appears in a list, 72-hour expiry plus
+the job token (403 without it). A live host whose TXT disappears goes `failed`,
+while an unreachable resolver changes nothing.
+
+Notes and deviations:
+
+- The tombstone rule was RLS-blind on the first cut: the app-side lookup and the
+  `before insert` trigger both ran as `app_rw` and could not see another org's row,
+  so the second org got `201`. Migration 0008 makes the trigger `SECURITY
+DEFINER` owned by the bypassing role and adds two lookup functions (ADR 0025).
+- Verification is DoH against `cloudflare-dns.com`, overridable with
+  `DNS_JSON_URL`; the suite points it at a local stub that also stubs the
+  Cloudflare API, so stage 4 runs offline and without quota.
+- `arch/edge.md` says a missing TXT flips a host to `failed`; implemented, but
+  only on a real mismatch — a resolver error leaves the status untouched.
+- Adding a hostname requires an `active` service; provisioning alone is not enough.
+
+Blocked on the operator: the Cloudflare for SaaS entitlement itself
+(`OPEN-OPS-04`). Everything above works without it — rows simply stop at
+`verifying` with the TXT proven, and promote by themselves once quota exists.

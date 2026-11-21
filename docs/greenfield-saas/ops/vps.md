@@ -30,7 +30,7 @@ unattended upgrades, and `sysctl` for the file descriptors Next needs.
 
 ## Deploy
 
-From the workstation, with `.env` filled (`Server_IP`, `Username`, `DOMAIN`):
+From the workstation, with `.env` filled (`Server_IP`, `DEPLOY_USER`, `DOMAIN`):
 
 ```sh
 pnpm run ci
@@ -57,6 +57,30 @@ migration's own note.
 `/etc/chameleon/env` holds `DATABASE_URL` (the `app_rw` URL **with `sslmode=verify-full`**),
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `MAIL_SINK` is unset in production.
 `app_migrator` and `app_admin` URLs stay on the workstation.
+
+## The 444 rule and the proxy
+
+Caddy answers `444` to any Host it has no vhost for, but only the origin can show
+that. Through Cloudflare a request with a foreign Host is rejected at the edge with
+Cloudflare's own `403`, because the name is not on the zone. So the check is
+`curl -sk -o /dev/null -w "%{http_code}" --resolve app.<domain>:443:<ip>
+https://app.<domain>/ -H 'Host: bogus'` and it must print `444`. Custom hostnames
+(stage 4) do reach the origin with their own Host, but a Worker holds the route, so
+the vhost list on the box stays `app.` only.
+
+`Server: cloudflare` is always present while proxied; `-Server` in Caddy removes
+the origin's own, which is the part we control.
+
+## Domain job
+
+Both units ship with every deploy (they live in the release, not only in
+provisioning) and the deploy fails if a run does not answer.
+
+`chameleon-domains.timer` runs `chameleon-domains.service` every five minutes,
+which POSTs to `/api/jobs/domains` on loopback with `JOBS_TOKEN`. It expires
+72-hour-unproven hostnames, re-checks pending ones every five minutes and active
+ones daily. Watch it with `journalctl -u chameleon-domains`; a `403` means
+`JOBS_TOKEN` in `/etc/chameleon/env` and in the unit disagree.
 
 ## Checks
 

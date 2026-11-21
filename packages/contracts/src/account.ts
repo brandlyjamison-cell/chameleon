@@ -56,3 +56,19 @@ export const SERVICE_VIEW_FIELDS = [
   "activated_at",
   "created_at",
 ] as const;
+
+/** A bare hostname; normalisation and the real check are server-side. */
+export const DomainSchema = z.object({
+  hostname: z.string().trim().min(4).max(253),
+});
+
+/** What a tenant needs to publish the TXT record and read the state. */
+export interface DomainView {
+  id: string;
+  hostname: string;
+  status: string;
+  verifyName: string;
+  verifyValue: string;
+  detail: string | null;
+  checkedAt: string | null;
+}

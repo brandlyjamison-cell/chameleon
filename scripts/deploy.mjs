@@ -5,7 +5,7 @@
  * restarts, and only then reports success. The previous build stays as
  * /srv/chameleon.prev for a one-command rollback.
  *
- * Needs .env: Server_IP, Username, DOMAIN, and the key at ~/.ssh/chameleon_deploy.
+ * Needs .env: Server_IP, DEPLOY_USER, DOMAIN, and the key at ~/.ssh/chameleon_deploy.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -21,7 +21,8 @@ for (const file of [".env", ".env.db"]) {
 }
 
 const host = process.env.Server_IP;
-const user = process.env.Username ?? "deploy";
+// `Username` collides with the Windows USERNAME variable, so DEPLOY_USER wins.
+const user = process.env.DEPLOY_USER ?? "deploy";
 const domain = process.env.DOMAIN;
 const key =
   process.env.DEPLOY_KEY_PATH ??
@@ -48,9 +49,15 @@ function sh(cmd, args, opts = {}) {
 
 function ssh(remote, { input } = {}) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn("ssh", [...sshBase, target, remote], {
-      stdio: [input ? "pipe" : "ignore", "inherit", "inherit"],
-    });
+    const child = spawn(
+      "ssh",
+      [...sshBase, "-o", "ServerAliveInterval=15", target, remote],
+      {
+        stdio: [input ? "pipe" : "ignore", "inherit", "inherit"],
+      },
+    );
+    // ssh waits on stdin until EOF; without this the env step hangs forever.
+    if (input) child.stdin.end(input);
     child.on("error", reject);
     child.on("close", (code) =>
       code === 0 ? resolvePromise() : reject(new Error(remote)),
@@ -58,30 +65,30 @@ function ssh(remote, { input } = {}) {
   });
 }
 
-async function ship(dir) {
+async function ship(dir, remote = "/srv/chameleon.stage") {
   await new Promise((resolvePromise, reject) => {
     const tar = spawn("tar", ["-cf", "-", "-C", dir, "."], {
       stdio: ["ignore", "pipe", "inherit"],
     });
-    const remote = spawn(
-      "ssh",
-      [...sshBase, target, "tar -xf - -C /srv/chameleon.stage"],
-      {
-        stdio: ["pipe", "inherit", "inherit"],
-      },
-    );
-    tar.stdout.pipe(remote.stdin);
-    remote.on("error", reject);
-    remote.on("close", (code) =>
-      code === 0 ? resolvePromise() : reject(new Error("tar over ssh")),
+    const remoteProc = spawn("ssh", [...sshBase, target, `tar -xf - -C ${remote}`], {
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+    tar.stdout.pipe(remoteProc.stdin);
+    remoteProc.on("error", reject);
+    remoteProc.on("close", (code) =>
+      code === 0 ? resolvePromise() : reject(new Error(`tar over ssh into ${remote}`)),
     );
   });
 }
 
 console.log(`→ deploy to ${domain} (${target})`);
 
-console.log("→ gate");
-sh(win ? "pnpm.cmd" : "pnpm", ["run", "ci"]);
+if (process.argv.includes("--skip-gate")) {
+  console.log("→ gate (skipped)");
+} else {
+  console.log("→ gate");
+  sh(win ? "pnpm.cmd" : "pnpm", ["run", "ci"]);
+}
 
 console.log("→ build");
 sh(win ? "pnpm.cmd" : "pnpm", ["--filter", "@chameleon/control", "build"]);
@@ -97,21 +104,23 @@ await ssh(
       `DATABASE_URL=${(process.env.DATABASE_URL_APP_RW ?? "").replace("sslmode=require", "sslmode=verify-full")}`,
       `BETTER_AUTH_SECRET=${process.env.BETTER_AUTH_SECRET ?? ""}`,
       `BETTER_AUTH_URL=https://app.${domain}`,
+      `JOBS_TOKEN=${process.env.JOBS_TOKEN ?? ""}`,
+      `CLOUDFLARE_ZONE_ID=${process.env.CLOUDFLARE_ZONE_ID ?? ""}`,
+      `CLOUDFLARE_API_KEY=${process.env.CLOUDFLARE_API_KEY ?? ""}`,
       "",
     ].join("\n"),
   },
 );
 
 console.log("→ stage");
+// `install -d -o` needs root; the tree must end up owned by deploy so tar can
+// write into it.
 await ssh(
-  "rm -rf /srv/chameleon.stage && install -d -o deploy -g deploy /srv/chameleon.stage",
+  "sudo rm -rf /srv/chameleon.stage && sudo install -d -o deploy -g deploy /srv/chameleon.stage",
 );
 const standalone = resolve("apps/control/.next/standalone");
 await ship(standalone);
-await ssh(
-  "install -d -o deploy -g deploy /srv/chameleon.stage/apps/control/.next && " +
-    "cp -r /srv/chameleon.stage/apps/control/.next/static /srv/chameleon.stage/apps/control/.next/static.tmp 2>/dev/null || true",
-).catch(() => undefined);
+await ssh("sudo install -d -o deploy -g deploy /srv/chameleon.stage/apps/control/.next");
 await new Promise((resolvePromise, reject) => {
   const tar = spawn("tar", ["-cf", "-", "-C", "apps/control/.next", "static"], {
     stdio: ["ignore", "pipe", "inherit"],
@@ -134,6 +143,35 @@ await ssh(
     "sudo mv /srv/chameleon.stage /srv/chameleon && sudo chown -R deploy:deploy /srv/chameleon",
 );
 await ssh("sudo systemctl restart chameleon");
+
+// The job units are part of the release, not of provisioning: a first deploy can
+// land after provision, and a unit change must ship with the code that needs it.
+console.log("→ job units");
+await ssh("sudo install -d -m 0755 -o deploy -g deploy /tmp/chameleon-ops");
+await ship(resolve("ops"), "/tmp/chameleon-ops");
+await ssh(
+  "sudo install -m 0644 /tmp/chameleon-ops/systemd/chameleon-domains.service /etc/systemd/system/ && " +
+    "sudo install -m 0644 /tmp/chameleon-ops/systemd/chameleon-domains.timer /etc/systemd/system/ && " +
+    "sudo systemctl daemon-reload && sudo systemctl enable --now chameleon-domains.timer",
+);
+// Prove the token path here rather than trusting the unit file.
+await ssh("sudo systemctl start chameleon-domains");
+const job = await new Promise((done) => {
+  const child = spawn(
+    "ssh",
+    [...sshBase, target, "sudo journalctl -u chameleon-domains -n 5 --no-pager -o cat"],
+    {
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+  let out = "";
+  child.stdout?.on("data", (chunk) => (out += chunk));
+  child.on("close", () => done(out));
+});
+if (!/"checked"/.test(job)) {
+  console.error(`✗ domain job did not answer: ${job.trim().slice(-200)}`);
+  process.exit(1);
+}
 
 console.log("→ health");
 let healthy = false;

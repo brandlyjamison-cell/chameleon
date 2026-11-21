@@ -69,3 +69,89 @@ export async function softDelete(c: pg.PoolClient, id: string): Promise<void> {
     [id],
   );
 }
+
+export interface VerifyRow extends DomainRow {
+  cf_hostname_id: string | null;
+  verified_at: Date | null;
+  last_checked_at: Date | null;
+}
+
+export const TXT_PREFIX = "cameleon-verify=";
+
+export async function beginVerify(c: pg.PoolClient, id: string): Promise<VerifyRow> {
+  const { rows } = await c.query<VerifyRow>(
+    // Active rows are re-checked daily and keep their status; nothing else can
+    // skip `verifying`, so a mismatch can never silently revive a failed host.
+    `update domains set
+       status = case when status in ('pending', 'verifying') then 'verifying' else status end,
+       last_checked_at = now()
+     where id = $1 and deleted_at is null and status <> 'failed'
+     returning id, org_id, service_id, hostname, status, verify_token,
+               cf_hostname_id, verified_at, last_checked_at`,
+    [id],
+  );
+  return orNotFound(rows[0]);
+}
+
+export async function recordCheck(
+  c: pg.PoolClient,
+  id: string,
+  result: "match" | "mismatch" | "error",
+  detail: string | null,
+): Promise<void> {
+  await c.query(
+    `insert into domain_checks (org_id, domain_id, result, detail)
+     select org_id, id, $2, $3 from domains where id = $1`,
+    [id, result, detail],
+  );
+  await c.query(`update domains set last_checked_at = now() where id = $1`, [id]);
+}
+
+/**
+ * A proven TXT is not an active host: hold `verified_at` and the Cloudflare id,
+ * and let a separate step promote once Cloudflare says the hostname is active.
+ */
+export async function markProven(
+  c: pg.PoolClient,
+  id: string,
+  cfHostnameId: string | null,
+): Promise<void> {
+  await c.query(
+    `update domains set verified_at = coalesce(verified_at, now()), verified_by = 'txt',
+       cf_hostname_id = coalesce($2, cf_hostname_id)
+     where id = $1 and deleted_at is null`,
+    [id, cfHostnameId],
+  );
+}
+
+/** A live host whose TXT disappeared: the edge must stop rendering it. */
+export async function fail(c: pg.PoolClient, id: string): Promise<void> {
+  await c.query(
+    `update domains set status = 'failed' where id = $1 and deleted_at is null`,
+    [id],
+  );
+}
+
+export async function promote(c: pg.PoolClient, id: string): Promise<void> {
+  await c.query(
+    `update domains set status = 'active' where id = $1 and verified_at is not null
+       and deleted_at is null`,
+    [id],
+  );
+}
+
+export async function expireStale(c: pg.PoolClient): Promise<number> {
+  const { rows } = await c.query<{ n: number }>("select expire_stale_domains() as n");
+  return rows[0]?.n ?? 0;
+}
+
+/**
+ * Cross-tenant due list; the caller is a bare connection, not a tenant, so this
+ * one goes through the SECURITY DEFINER function (0007).
+ */
+export async function dueForCheck(c: pg.PoolClient, limit = 25): Promise<VerifyRow[]> {
+  const { rows } = await c.query<VerifyRow>("select * from due_domain_checks($1)", [
+    limit,
+  ]);
+  return rows;
+}
