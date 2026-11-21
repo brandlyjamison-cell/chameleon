@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies as nextCookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { Ctx, Role } from "@chameleon/db";
 import { auth } from "./auth";
 import { asTenant } from "./db";
@@ -83,6 +84,25 @@ export async function currentSession(
 }
 
 /** Tenant context for repos. Throws 401/409 rather than 404. */
+/**
+ * Pages: a missing or stale session is a redirect, never an error page. Routes
+ * keep throwing 401 so an API caller can see the status.
+ */
+export async function requirePageSession(): Promise<
+  Ctx & { emailVerified: boolean; email: string }
+> {
+  const session = await currentSession();
+  if (!session) redirect("/login");
+  if (!session.orgId || !session.role) redirect("/login");
+  return {
+    orgId: session.orgId,
+    userId: session.userId,
+    role: session.role,
+    emailVerified: session.emailVerified,
+    email: session.email,
+  };
+}
+
 export async function requireSession(
   headers?: HeaderSource,
 ): Promise<Ctx & { emailVerified: boolean }> {

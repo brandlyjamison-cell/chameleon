@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireSession, requireOwner } from "../../../server/session";
+import { requirePageSession, requireOwner } from "../../../server/session";
 
 const errors: Record<string, string> = {
   owner_only: "Only the owner can create a service.",
@@ -11,7 +11,7 @@ export default async function NewService({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await requireSession();
+  const session = await requirePageSession();
   if (!session.orgId) redirect("/welcome");
   const { error } = await searchParams;
 
@@ -22,7 +22,7 @@ export default async function NewService({
   }
 
   return (
-    <>
+    <main className="app" id="content">
       <h1>New service</h1>
       {error && <p className="error">{errors[error] ?? "Could not create it."}</p>}
       <form action="/api/services" method="post">
@@ -45,6 +45,6 @@ export default async function NewService({
         </p>
         <button type="submit">Create</button>
       </form>
-    </>
+    </main>
   );
 }

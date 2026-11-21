@@ -4,7 +4,7 @@ import { authClient } from "../../../lib/auth-client";
 
 export default function Passkeys() {
   return (
-    <>
+    <main className="app" id="content">
       <h1>Passkeys</h1>
       <p className="muted">
         A passkey is a second factor that cannot be phished with a password. Required for
@@ -26,6 +26,6 @@ export default function Passkeys() {
         The list and deletion controls arrive with the admin panel; one credential is
         enough to sign in with.
       </p>
-    </>
+    </main>
   );
 }

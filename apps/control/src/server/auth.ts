@@ -2,8 +2,8 @@ import { betterAuth } from "better-auth";
 import { passkey } from "@better-auth/passkey";
 import { PostgresDialect } from "kysely";
 import { randomUUID } from "node:crypto";
-import { appendFileSync } from "node:fs";
 import { requireDb } from "./db";
+import { button, sendMail, shell } from "./mail";
 
 export const BASE_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
@@ -53,17 +53,19 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, token }) => {
       const url = `${BASE_URL}/api/auth/verify-email?token=${token}&callbackURL=/welcome`;
-      // Stage 3 reads the link from a sink file; SMTP arrives with the mailbox
-      // provider.
       console.log(`[mail] verify ${user.email}: ${url}`);
-      const sink = process.env.MAIL_SINK;
-      if (sink) {
-        appendFileSync(
-          sink,
-          `${JSON.stringify({ to: user.email, url })}
-`,
-        );
-      }
+      await sendMail({
+        to: user.email,
+        subject: "Confirm your Chameleon address",
+        text: `Confirm ${user.email} to finish setting up Chameleon:
+${url}
+
+The link is good for 24 hours.`,
+        html: shell(
+          "Confirm your address",
+          `<p style="margin:0 0 18px;color:#b6c2cf">One click and ${user.email} stops being provisional. The link is good for 24 hours.</p>${button(url, "Confirm address")}`,
+        ),
+      });
     },
   },
   plugins: [

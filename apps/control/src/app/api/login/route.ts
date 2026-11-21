@@ -12,7 +12,18 @@ export async function POST(req: Request): Promise<Response> {
       body: { email: input.email, password: input.password },
       asResponse: true,
     });
-    if (!signed.ok) return seeOther("/login?error=credentials");
+    if (!signed.ok) {
+      // Say "unverified" instead of "wrong password" when that is the real cause.
+      const { rows } = await requireDb().pool.query<{ verified: boolean }>(
+        `select "emailVerified" as verified from auth_user where lower(email) = lower($1) limit 1`,
+        [input.email],
+      );
+      return seeOther(
+        rows[0] && !rows[0].verified
+          ? "/login?error=unverified"
+          : "/login?error=credentials",
+      );
+    }
 
     // Repair a signup whose org step died.
     const session = await currentSession(signed.headers);

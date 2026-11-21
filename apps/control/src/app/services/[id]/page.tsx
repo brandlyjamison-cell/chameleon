@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { NotFoundError } from "@chameleon/db";
-import { requireSession } from "../../../server/session";
+import { requirePageSession } from "../../../server/session";
 import { getService } from "../../../server/services";
 import {
   checkDomain,
@@ -34,7 +34,7 @@ export default async function ServiceDetail({
   searchParams: Promise<{ error?: string; activated?: string; domain_added?: string }>;
 }) {
   const { id } = await params;
-  const session = await requireSession();
+  const session = await requirePageSession();
   let service;
   try {
     service = await getService(session, id);
@@ -49,7 +49,7 @@ export default async function ServiceDetail({
     new Date(service.expiresAt) > new Date();
 
   return (
-    <>
+    <main className="app" id="content">
       <h1>{service.serviceType}</h1>
       <p className="muted">{service.id}</p>
       {error && <p className="error">{errors[error] ?? "That did not work."}</p>}
@@ -118,7 +118,7 @@ export default async function ServiceDetail({
       )}
 
       {service.activatedAt && <Domains id={service.id} session={session} />}
-    </>
+    </main>
   );
 }
 
@@ -127,13 +127,13 @@ async function Domains({
   session,
 }: {
   id: string;
-  session: Awaited<ReturnType<typeof requireSession>>;
+  session: Awaited<ReturnType<typeof requirePageSession>>;
 }) {
   const domains = await listDomains(session, id);
 
   async function addDomain(formData: FormData) {
     "use server";
-    const ctx = await requireSession();
+    const ctx = await requirePageSession();
     try {
       await requestDomain(ctx, id, String(formData.get("hostname") ?? ""));
     } catch (error) {
@@ -144,7 +144,7 @@ async function Domains({
 
   async function verifyDomain(formData: FormData) {
     "use server";
-    const ctx = await requireSession();
+    const ctx = await requirePageSession();
     try {
       await checkDomain(ctx, String(formData.get("domainId") ?? ""));
     } catch (error) {
@@ -155,7 +155,7 @@ async function Domains({
 
   async function deleteDomain(formData: FormData) {
     "use server";
-    const ctx = await requireSession();
+    const ctx = await requirePageSession();
     try {
       await removeDomain(ctx, String(formData.get("domainId") ?? ""));
     } catch (error) {
