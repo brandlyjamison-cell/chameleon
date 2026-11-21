@@ -155,3 +155,9 @@ renders when signed out. Service activation is gated on a confirmed payment, so
 a new service shows a subscribe button before the passcode form.
 
 CI runs the same gate on PRs; deploy stays manual (ADR 0021 amended).
+
+Throttle handling and CI: a provider 429 now parks a mail row for 15 minutes and
+refunds the attempt instead of retiring it; the admin queue shows rows and can
+retry. A pooled `app.org_id = ''` broke `/admin/mail`, so every tenant policy
+nulls the setting first and the queue read is a definer function. CI db secrets
+are set on the dev branch; the workflow runs the full gate.

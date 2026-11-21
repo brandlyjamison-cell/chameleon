@@ -46,12 +46,11 @@ Two tracks: submit the limit-increase form, and add a fallback provider
 (Resend/Postmark/SMTP) behind the same queue so one provider's throttle cannot
 delay a signup. Needs a provider account and key from the operator.
 
-### OPEN-OPS-07 — CI secrets for the db suites (blocks full CI)
+### OPEN-OPS-07 — closed 2026-11-21: CI secrets are set
 
-`.github/workflows/ci.yml` runs the gate, but without four repository secrets the
-db steps skip and only lint/typecheck/unit run. Needed: `DATABASE_URL_TEST`,
-`DATABASE_URL_TEST_APP_RW`, `DATABASE_URL_TEST_EDGE_RO`, `DATABASE_URL_TEST_ADMIN`,
-all pointed at the throwaway `dev` branch — never production.
+`DATABASE_URL_TEST`, `DATABASE_URL_TEST_APP_RW`, `DATABASE_URL_TEST_EDGE_RO` and
+`DATABASE_URL_TEST_ADMIN` are repository secrets, all on the `dev` branch. CI runs
+the full suite; the gate still skips db steps locally if they are absent.
 
 ## Service questions
 
