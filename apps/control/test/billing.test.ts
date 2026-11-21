@@ -137,6 +137,10 @@ describe.skipIf(!hasDb)("admin panel", () => {
     const page = await s.jar.get("/admin");
     expect(page.status).toBe(200);
     expect(await page.text()).toContain("Acme");
+
+    const mail = await s.jar.get("/admin/mail");
+    expect(mail.status).toBe(200);
+    expect(await mail.text()).toContain("Mail queue");
   });
 
   it("extends time and suspends from the panel", async () => {

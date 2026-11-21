@@ -72,7 +72,11 @@ export async function drain(limit = 20): Promise<DrainResult> {
       .pool.query("select finish_email($1, $2, $3)", [
         row.id,
         outcome,
-        outcome === "sent" ? null : "provider refused",
+        outcome === "sent"
+          ? null
+          : outcome === "throttled"
+            ? "throttled by provider"
+            : "provider refused",
       ])
       .catch(() => undefined);
     if (outcome === "sent") sent += 1;
@@ -110,10 +114,10 @@ export interface QueueRow {
 }
 
 export async function listQueue(limit = 100): Promise<QueueRow[]> {
+  // Definer function: the queue is read across tenants and the pool may carry an
+  // empty `app.org_id`.
   const { rows } = await requireDb().pool.query<QueueRow>(
-    `select id, kind, to_address, subject, status, attempts, last_error,
-            available_at, created_at, sent_at
-     from email_queue order by id desc limit $1`,
+    "select * from admin_emails($1)",
     [limit],
   );
   return rows;

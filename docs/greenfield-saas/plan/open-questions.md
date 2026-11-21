@@ -32,15 +32,19 @@ every callback without `NOWPAYMENTS_IPN_SECRET` and a payment never reaches
 
 ### OPEN-MAIL-01 — Cloudflare Email Sending is throttling the account (blocks signup delivery)
 
-`429 10004` on every send since 2026-11-21 16:00 UTC, reproducible outside the
-app. Their docs admit new accounts start with a conservative daily quota and
-point at a limit-increase form. Until it clears, verification and receipt mail
-park in `email_queue` (throttles no longer burn the retry budget) and signup
-confirmation is delayed.
+`429 10004` for some recipients since 2026-11-21 16:00 UTC, reproducible outside
+the app. It is not uniform: the operator's verified inbox returns 200 while
+mailinator returns 429, so the sending domain and token are fine and this is a
+quota/recipient-reputation throttle, not a broken integration. Their docs admit
+new accounts start with a conservative daily quota and point at a limit-increase
+form.
+
+Interim: throttles park in `email_queue` for 15 minutes without spending tries
+(ADR 0027), so nothing is lost and real signups still deliver.
 
 Two tracks: submit the limit-increase form, and add a fallback provider
-(Resend/Postmark/SMTP) behind the same queue so one provider's quota cannot stop
-signups. Needs a provider account and key from the operator.
+(Resend/Postmark/SMTP) behind the same queue so one provider's throttle cannot
+delay a signup. Needs a provider account and key from the operator.
 
 ### OPEN-OPS-07 — CI secrets for the db suites (blocks full CI)
 

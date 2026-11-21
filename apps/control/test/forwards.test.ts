@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admin } from "../../../packages/db/test/helpers";
+import { admin, appRw } from "../../../packages/db/test/helpers";
 import {
   activate,
   createService,
@@ -76,7 +76,9 @@ describe.skipIf(!hasDb)("platform mail queue", () => {
     );
     const id = created.rows[0]!.id;
     await admin.query("select claim_emails(100)");
-    await admin.query("select finish_email($1, 'throttled', 'provider refused')", [id]);
+    await admin.query("select finish_email($1, 'throttled', 'throttled by provider')", [
+      id,
+    ]);
 
     const row = await admin.query<{
       status: string;
@@ -85,6 +87,12 @@ describe.skipIf(!hasDb)("platform mail queue", () => {
     }>("select status, attempts, available_at from email_queue where id = $1", [id]);
     expect(row.rows[0]?.status).toBe("queued");
     expect(row.rows[0]?.attempts).toBe(0);
+    // The park path must name the throttle, not reuse the generic refusal text.
+    const parked = await admin.query<{ last_error: string }>(
+      "select coalesce(last_error, '') as last_error from email_queue where id = $1",
+      [id],
+    );
+    expect(parked.rows[0]?.last_error).toBe("throttled by provider");
     const minutes = (row.rows[0]!.available_at.getTime() - Date.now()) / 60_000;
     expect(minutes).toBeGreaterThan(13);
 
@@ -94,6 +102,15 @@ describe.skipIf(!hasDb)("platform mail queue", () => {
       [id],
     );
     expect(due.rows[0]!.available_at.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  it("reads tenant tables with an empty app.org_id", async () => {
+    // A pooled session can carry the GUC as ''; the policy nulls it instead of
+    // casting '' to uuid and throwing.
+    const res = await appRw.query<{ n: number }>(
+      "select count(*)::int as n from email_queue",
+    );
+    expect(res.rows[0]?.n).toBeGreaterThanOrEqual(0);
   });
 
   it("refuses the job without the token", async () => {
