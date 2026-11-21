@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ServiceTypeCodeSchema } from "./service.js";
+import { ServiceTypeCodeSchema } from "./service";
 
 /**
  * The KV resolution document for one slug on one host. The edge trusts this or

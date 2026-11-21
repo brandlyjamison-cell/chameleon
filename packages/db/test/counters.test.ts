@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 const hasDb = Boolean(process.env.DATABASE_URL_TEST);
-import { admin, appRw, reset, seed, tenantClient } from "./helpers.js";
+import { admin, appRw, reset, seed, tenantClient } from "./helpers";
 
 describe.skipIf(!hasDb)("slot counters (INV-DATA-04, INV-DATA-05)", () => {
   it("refuses a direct counter write from app_rw", async () => {

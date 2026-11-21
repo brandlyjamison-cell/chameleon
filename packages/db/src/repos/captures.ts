@@ -1,5 +1,5 @@
 import type pg from "pg";
-import type { Ctx } from "../ctx.js";
+import type { Ctx } from "../ctx";
 
 /** Mirrors set_capture_bucket() exactly; the bucket must be known on conflict. */
 export function bucketOf(at: Date): string {

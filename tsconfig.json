@@ -6,13 +6,13 @@
       "@chameleon/contracts": ["packages/contracts/src/index.ts"],
       "@chameleon/contracts/*": ["packages/contracts/src/*"],
       "@chameleon/skeleton": ["packages/skeleton/src/index.ts"],
-      "@chameleon/engine": ["packages/engine/src/index.ts"]
+      "@chameleon/engine": ["packages/engine/src/index.ts"],
+      "@chameleon/db": ["packages/db/src/index.ts"]
     }
   },
   "include": [
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts",
-    "apps/*/src/**/*.ts",
     "scripts/**/*.mjs",
     "vitest.config.ts"
   ]

@@ -1,4 +1,16 @@
 {
   "extends": "../../packages/config/tsconfig.base.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "jsx": "preserve",
+    "declaration": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "next-env.d.ts",
+    "next.config.ts"
+  ]
 }

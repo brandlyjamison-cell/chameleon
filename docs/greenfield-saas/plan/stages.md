@@ -70,7 +70,7 @@ Invariants: INV-DATA-01…08, INV-CAP-07…09.
 
 ---
 
-## Stage 3 — Auth, org, service provisioning
+## Stage 3 — Auth, org, service provisioning — done 2026-11-21
 
 Goal: a human can sign up, create an org, and get a service in `provisioning`.
 

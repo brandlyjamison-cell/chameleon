@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { CapError, orNotFound, type Ctx } from "../ctx.js";
+import { CapError, orNotFound, type Ctx } from "../ctx";
 
 export interface ServiceRow {
   id: string;

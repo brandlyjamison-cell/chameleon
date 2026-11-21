@@ -1,6 +1,6 @@
 import type { ServiceTypeCode } from "@chameleon/contracts";
-import { chameleon } from "./chameleon.js";
-import type { Engine } from "./types.js";
+import { chameleon } from "./chameleon";
+import type { Engine } from "./types";
 
 /**
  * The only switch over service types. Adding a type is a row plus an engine, never

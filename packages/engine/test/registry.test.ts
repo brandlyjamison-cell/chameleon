@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chameleon, engineFor, registeredCodes } from "../src/index.js";
+import { chameleon, engineFor, registeredCodes } from "../src/index";
 
 describe("engine registry (INV-ARCH-02)", () => {
   it("resolves a registered type", () => {

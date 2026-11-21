@@ -4,7 +4,7 @@ import {
   NOT_FOUND_BODY,
   NOT_FOUND_HEADERS,
   notFoundResponse,
-} from "../src/not-found.js";
+} from "../src/not-found";
 
 describe("the unbranded 404 (INV-EDGE-04, INV-EDGE-05)", () => {
   it("is byte-exact and 65 bytes", () => {
