@@ -36,13 +36,16 @@ export async function lockWithCaps(
   c: pg.PoolClient,
   serviceId: string,
 ): Promise<{
+  status: string;
+  activated_at: Date | null;
   link_cap: number;
   domain_cap: number;
   link_slots_used: number;
   domain_slots_used: number;
 }> {
   const { rows } = await c.query(
-    `select t.link_cap, t.domain_cap, s.link_slots_used, s.domain_slots_used
+    `select s.status, s.activated_at, t.link_cap, t.domain_cap,
+            s.link_slots_used, s.domain_slots_used
      from services s join tiers t on t.id = s.tier_id
      where s.id = $1 for update of s`,
     [serviceId],

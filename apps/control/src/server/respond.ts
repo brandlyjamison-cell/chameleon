@@ -39,6 +39,12 @@ const messages: Record<string, string> = {
   email_unverified: "Verify your email before activating.",
   passcode_mismatch: "That passcode does not match the one already set.",
   no_org: "Your account has no org yet.",
+  service_not_active: "Activate the service before adding a hostname.",
+  domain_exists: "That hostname is already attached.",
+  domain_tombstoned: "Another org used that hostname in the last 30 days.",
+  domain_slots_exhausted: "No domain slots left on this tier.",
+  zone_full: "The platform is at its live-domain ceiling.",
+  bad_hostname: "That is not a hostname.",
 };
 
 export function handleError(error: unknown): Response {
@@ -60,7 +66,10 @@ export function handleError(error: unknown): Response {
     return json({ error: "not_found", message: "Not found." }, 404);
   }
   if (error instanceof CapError || (error as { status?: number }).status === 409) {
-    return json({ error: "cap", message: "No slots left on this tier." }, 409);
+    // CapError carries `domain_slots_exhausted` / `link_slots_exhausted`.
+    const code = (error as { message?: string }).message ?? "";
+    const slot = code.endsWith("_slots_exhausted") ? code : "cap";
+    return json({ error: slot, message: "No slots left on this tier." }, 409);
   }
   console.error(error);
   return json({ error: "internal", message: "Something broke." }, 500);

@@ -234,7 +234,9 @@ zone has no active core subscription, so Cloudflare for SaaS cannot be enabled
 until the zone is at least Pro. Workers Paid is a separate need for Queues,
 Durable Objects and Browser Rendering (stages 6-9). Everything else is reachable
 with the current token. Lean: Pro before the first custom-hostname attach, Workers
-Paid before stage 6.
+Paid before stage 6. Operator could not upgrade on 2026-11-21, so stage 4 shipped
+without it: a proven TXT sits at `verifying` with `cf_entitlement_missing` and
+promotes by itself once quota exists.
 
 ### OPEN-OPS-05 — mailcow shares the box and owns 80/443 (blocks deploy)
 

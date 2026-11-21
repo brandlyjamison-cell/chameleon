@@ -1,0 +1,9 @@
+[Unit]
+Description=chameleon domain verify pass
+After=network-online.target chameleon.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/chameleon/env
+ExecStart=/usr/bin/curl -fsS -X POST -H "x-job-token: ${JOBS_TOKEN}" http://127.0.0.1:3000/api/jobs/domains

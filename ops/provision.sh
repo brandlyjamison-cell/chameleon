@@ -48,10 +48,19 @@ chown root:deploy /etc/chameleon/env
 chmod 0640 /etc/chameleon/env
 
 install -D -m 0644 "$(dirname "$0")/systemd/chameleon.service" /etc/systemd/system/chameleon.service
+install -D -m 0644 "$(dirname "$0")/systemd/chameleon-domains.service" /etc/systemd/system/chameleon-domains.service
+install -D -m 0644 "$(dirname "$0")/systemd/chameleon-domains.timer" /etc/systemd/system/chameleon-domains.timer
 systemctl daemon-reload
 systemctl enable chameleon
+systemctl enable --now chameleon-domains.timer
 
 ACME_EMAIL="$ACME_EMAIL" envsubst <"$(dirname "$0")/caddy/Caddyfile" >/etc/caddy/Caddyfile
+# Caddy's log sink must exist and belong to the service user, or the config
+# fails to load (and a root-run `caddy validate` steals the file).
+install -d -m 0755 -o caddy -g caddy /var/log/caddy
+touch /var/log/caddy/app.log
+chown caddy:caddy /var/log/caddy/app.log
+chmod 0640 /var/log/caddy/app.log
 systemctl enable --now caddy
 
 # Firewall: SSH only from the operator, HTTP(S) only from Cloudflare.
