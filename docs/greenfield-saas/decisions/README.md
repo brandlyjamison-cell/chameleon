@@ -40,5 +40,6 @@ Index:
 | 0028 | Console IA and white service surfaces                 | accepted |
 | 0029 | Provider is the payment authority; `finished` credits | accepted |
 | 0030 | DB rate limits and a money-driven lifecycle sweep     | accepted |
+| 0031 | Operator surfaces: flag plus definer, not a role      | accepted |
 
-Last reviewed: 2026-11-21
+Last reviewed: 2026-11-22
