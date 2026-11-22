@@ -64,8 +64,8 @@ await db.query(
   [serviceId],
 );
 const domain = await db.query(
-  "insert into domains (org_id, service_id, hostname, verify_token, status, verified_at, last_checked_at) values ($1, $2, 'login.northwind-cloud.com', 'demo', 'active', now(), now()) returning id",
-  [orgId, serviceId],
+  "insert into domains (org_id, service_id, hostname, verify_token, status, verified_at, last_checked_at) values ($1, $2, 'login.' || $3, 'demo', 'active', now(), now()) returning id",
+  [orgId, serviceId, `northwind-${epoch}.com`],
 );
 const link = await db.query(
   "insert into links (org_id, service_id, domain_id, slug, pinned_brand_id) values ($1, $2, $3, 'A7K2M', (select id from brands where slug = 'microsoft-365')) returning id",

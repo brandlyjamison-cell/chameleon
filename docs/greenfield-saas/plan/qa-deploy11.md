@@ -12,8 +12,8 @@ Run against https://app.mailerdeaon.bid. Record raw evidence per step.
 3. Create a service (`POST /api/services` `serviceType=chameleon&tier=pro`).
 4. `/services/<id>`: unpaid banner and "Subscribe — $…". Then set it paid in SQL:
    `update services set status='active', activated_at=now(), paid_at=now(),
-   paid_until=now()+interval '30 days', expires_at=now()+interval '30 days'
-   where id='<id>'`. Reload: links, hostnames, captures, forwarding, advanced
+paid_until=now()+interval '30 days', expires_at=now()+interval '30 days'
+where id='<id>'`. Reload: links, hostnames, captures, forwarding, advanced
    all render.
 5. Add a hostname at `/settings/domains` (`qa-<epoch>.example.com`).
    - TXT type, host/name, value and TTL are **visible without expanding

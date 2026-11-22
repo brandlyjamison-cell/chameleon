@@ -9,7 +9,7 @@ import {
 import { listServices } from "../../../server/services";
 import { DnsRecords } from "../../../components/dns-record";
 import { ConfirmSubmit } from "../../../components/shell";
-import { Empty, PageHeader, StatusPill } from "../../../components/ui";
+import { Empty, PageHeader } from "../../../components/ui";
 
 function codeOf(error: unknown): string {
   return (error as { code?: string }).code ?? "not_found";
@@ -86,7 +86,6 @@ export default async function DomainsPage() {
                         <a href={`/services/${domain.serviceId}#domains`}>Open service</a>
                       </div>
                     </div>
-                    <StatusPill status={domain.status} />
                   </div>
                   <DnsRecords
                     domain={domain}

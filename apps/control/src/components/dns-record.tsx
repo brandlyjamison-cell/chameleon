@@ -107,9 +107,11 @@ export function DnsRecords({
             Check now
           </button>
         </form>
-        <a className="btn ghost sm" href={`/services/${serviceId}#domains`}>
-          Service
-        </a>
+        {returnTo ? (
+          <a className="btn ghost sm" href={`/services/${serviceId}#domains`}>
+            Service
+          </a>
+        ) : null}
       </div>
     </div>
   );
