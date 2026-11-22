@@ -18,7 +18,7 @@ export default async function Dashboard() {
   const mail = await listOrgQueue(session, 5).catch(() => []);
   const failedMail = mail.filter((row) => row.status === "failed");
 
-  const live = services.filter((service) => service.status === "active");
+  const live = services.filter((service) => service.status !== "archived");
   const unpaid = services.filter(
     (service) =>
       !service.paidUntil || new Date(service.paidUntil).getTime() <= Date.now(),
@@ -111,10 +111,17 @@ export default async function Dashboard() {
                 {services.map((service) => (
                   <div className="tr" key={service.id}>
                     <a href={`/services/${service.id}`}>
-                      <strong>{service.serviceType}</strong>
-                      <span className="muted"> {service.tier} tier</span>
+                      <strong>{service.name}</strong>
+                      <span className="muted">
+                        {" "}
+                        {service.serviceType} · {service.tier}
+                      </span>
                     </a>
-                    <StatusPill status={service.status} />
+                    <StatusPill
+                      status={
+                        service.subscription === "due" ? "past_due" : service.status
+                      }
+                    />
                     <span className="muted">{money(service.priceCents)} / 30d</span>
                     <span className="muted">
                       {service.paidUntil

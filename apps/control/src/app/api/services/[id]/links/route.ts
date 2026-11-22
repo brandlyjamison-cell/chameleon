@@ -24,9 +24,9 @@ export async function POST(
   try {
     const ctx = await requireSession(req.headers);
     const { id } = await params;
-    const body = (await req.json()) as { domainId?: string; brandId?: string };
+    const body = (await req.json()) as { hostnameId?: string; brandId?: string };
     const link = await mintLink(ctx, id, {
-      domainId: body.domainId ?? "",
+      hostnameId: body.hostnameId ?? "",
       brandId: body.brandId ?? "",
     });
     return Response.json(link, { status: 201 });

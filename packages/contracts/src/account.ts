@@ -24,6 +24,8 @@ export const LoginSchema = z.object({
 export const CreateServiceSchema = z.object({
   serviceType: ServiceTypeCodeSchema,
   tier: TierCodeSchema,
+  /** Tenant-defined; falls back to "Chameleon Starter" when omitted. */
+  name: z.string().trim().min(2).max(60).optional(),
 });
 
 export const ActivateSchema = z.object({
@@ -63,25 +65,53 @@ export const SERVICE_VIEW_FIELDS = [
   "price_cents",
 ] as const;
 
-/** A bare hostname; normalisation and the real check are server-side. */
+/** A root domain, as typed by the tenant. Normalisation happens server-side. */
 export const DomainSchema = z.object({
-  hostname: z.string().trim().min(4).max(253),
+  root: z.string().trim().min(4).max(253),
+});
+
+/** A label under a verified root; the FQDN is derived, never typed. */
+export const HostnameSchema = z.object({
+  domainId: z.string().uuid(),
+  label: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, "bad_label"),
 });
 
 /**
- * Every field the tenant must publish, plus enough state to explain a failure.
- * `routing` is null while the SaaS entitlement is missing (OPEN-OPS-04).
+ * Every field the tenant must publish for the root, plus enough state to explain
+ * a failure. `routing` is null until the provider entitlement exists, at which
+ * point it is the single wildcard CNAME.
  */
-export interface DomainView {
+export interface OrgDomainView {
   id: string;
-  hostname: string;
+  root: string;
   status: string;
+  routingState: "dns_pending" | "waiting" | "active";
+  reviewNeeded: boolean;
   verifyName: string;
   verifyValue: string;
   recordType: "TXT";
   ttl: 300;
   routing: { type: "CNAME"; name: string; value: string } | null;
+  /** The platform wildcard target, whether or not routing is ready. */
+  target: string;
   detail: string | null;
   checkedAt: string | null;
   lastResult: "match" | "mismatch" | "error" | null;
+  hostnameCount: number;
+}
+
+export interface HostnameView {
+  id: string;
+  domainId: string;
+  serviceId: string;
+  fqdn: string;
+  label: string;
+  status: string;
+  createdAt: string;
 }

@@ -42,8 +42,10 @@ export default async function Services() {
           {live.map((service) => (
             <article className="card" key={service.id}>
               <div className="row">
-                <h2 style={{ margin: 0 }}>{service.serviceType}</h2>
-                <StatusPill status={service.status} />
+                <h2 style={{ margin: 0 }}>{service.name}</h2>
+                <StatusPill
+                  status={service.subscription === "due" ? "past_due" : service.status}
+                />
               </div>
               <dl className="kv" style={{ marginTop: "0.8rem" }}>
                 <dt>Tier</dt>
@@ -79,9 +81,12 @@ export default async function Services() {
             {archived.map((service) => (
               <div className="tr" key={service.id}>
                 <a href={`/services/${service.id}`}>
-                  <strong>{service.serviceType}</strong>
+                  <strong>{service.name}</strong>
+                  <span className="muted"> {service.serviceType}</span>
                 </a>
-                <StatusPill status={service.status} />
+                <StatusPill
+                  status={service.subscription === "due" ? "past_due" : service.status}
+                />
                 <span className="muted">{service.tier}</span>
                 <span className="muted">{shortDate(service.createdAt)}</span>
                 <span />

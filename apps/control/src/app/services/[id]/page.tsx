@@ -6,15 +6,15 @@ import { requirePageSession } from "../../../server/session";
 import { latestPayment } from "../../../server/billing";
 import { addAddress, listAddresses } from "../../../server/forwards";
 import { activateIn, getService } from "../../../server/services";
+import { routingTarget } from "../../../server/domains";
 import {
-  listDomains,
-  removeDomain,
-  requestDomain,
-  routingTarget,
+  addHostname,
+  listHostnames,
+  listOrgDomains,
+  removeHostname,
 } from "../../../server/domains";
 import { mintLink, listBrands, listLinks, revokeLink } from "../../../server/links";
 import { countCaptures, listCaptures } from "../../../server/vault";
-import { DnsRecords } from "../../../components/dns-record";
 import { CopyButton } from "../../../components/copy";
 import { ConfirmSubmit } from "../../../components/shell";
 import {
@@ -32,12 +32,15 @@ const errors: Record<string, string> = {
   invalid_input: "Check the highlighted value.",
   bad_passcode: "The passcode must be exactly 4 digits.",
   owner_only: "Only the org owner can do that.",
-  bad_hostname: "That is not a hostname (no scheme, no path).",
+  bad_label: "Use a hostname label such as portal, secure or access.",
   bad_brand: "Pick a brand for the link.",
-  domain_and_brand_required: "A link needs a hostname and a brand.",
-  domain_exists: "That hostname is already attached here.",
-  domain_tombstoned: "Another org used that hostname in the last 30 days.",
-  domain_not_active: "Wait until the hostname is active before creating links.",
+  hostname_and_brand_required: "A link needs a hostname and a brand.",
+  hostname_exists: "That hostname is already in use.",
+  hostname_tombstoned: "Another org used that hostname in the last 30 days.",
+  hostname_not_active: "Wait until the hostname routes before creating links.",
+  hostname_slots_exhausted: "The service is at its hostname limit.",
+  domain_not_verified: "Verify the domain before creating its hostnames.",
+  name_taken: "Another service already has that name.",
   cap: "No slots left on this tier for that.",
   zone_full: "The platform is at its live-domain ceiling.",
   not_found: "That row is gone.",
@@ -53,9 +56,9 @@ const errors: Record<string, string> = {
 
 const okay: Record<string, string> = {
   activated: "Activated. The 30-day clock is running.",
-  domain_added: "Hostname added. Publish the records below, then check.",
-  domain_checked: "Check finished. The state below is the probe result.",
-  domain_active: "Verified and live. TLS is issued and the host routes.",
+  domain_added: "Domain added. Publish the records, then check.",
+  hostname_added: "Hostname created. It answers once routing is live.",
+  hostname_removed: "Hostname removed and held for 30 days.",
   link_minted: "Link created. It is live as soon as the hostname is.",
   link_revoked: "Link revoked. Nothing new resolves on it.",
   forward_added: "Address saved. Confirm it if it is not your signup address.",
@@ -87,22 +90,26 @@ export default async function ServiceDetail({
   const error = paramsOut.error;
   const flash = Object.keys(okay).find((key) => paramsOut[key]);
 
-  const paid = service.paidUntil !== null && new Date(service.paidUntil) > new Date();
+  const paid = service.subscription === "paid";
   const payment = paid ? null : await latestPayment(session, service.id);
   const activated = Boolean(service.activatedAt);
   const price = money(service.priceCents);
 
-  const [domains, links, brands, captures, totalCaptures, addresses] = activated
-    ? await Promise.all([
-        listDomains(session, id),
-        listLinks(session, id),
-        listBrands(),
-        listCaptures(session, { serviceId: id, limit: 5 }),
-        countCaptures(session, { serviceId: id }),
-        listAddresses(session),
-      ])
-    : [[], [], [], [], { total: 0, new: 0, valid: 0, invalid: 0 }, []];
-  const activeDomains = domains.filter((domain) => domain.status === "active");
+  const [hostnames, orgDomains, links, brands, captures, totalCaptures, addresses] =
+    activated
+      ? await Promise.all([
+          listHostnames(session, id),
+          listOrgDomains(session),
+          listLinks(session, id),
+          listBrands(),
+          listCaptures(session, { serviceId: id, limit: 5 }),
+          countCaptures(session, { serviceId: id }),
+          listAddresses(session),
+        ])
+      : [[], [], [], [], [], { total: 0, new: 0, valid: 0, invalid: 0 }, []];
+  const routable = orgDomains.filter((domain) =>
+    ["active", "routing_waiting"].includes(domain.status),
+  );
 
   async function activate(formData: FormData) {
     "use server";
@@ -120,34 +127,43 @@ export default async function ServiceDetail({
     redirect(`/services/${id}?activated=1`);
   }
 
-  async function addDomain(formData: FormData) {
+  async function addHostnameAction(formData: FormData) {
     "use server";
     const ctx = await requirePageSession();
     try {
-      await requestDomain(ctx, id, String(formData.get("hostname") ?? ""));
+      await addHostname(ctx, id, {
+        domainId: String(formData.get("domainId") ?? ""),
+        label: String(formData.get("label") ?? ""),
+      });
     } catch (reason) {
       redirect(`/services/${id}?error=${codeOf(reason)}#domains`);
     }
-    redirect(`/services/${id}?domain_added=1#domains`);
+    redirect(`/services/${id}?hostname_added=1#domains`);
   }
 
-  async function deleteDomain(formData: FormData) {
+  async function deleteHostname(formData: FormData) {
     "use server";
     const ctx = await requirePageSession();
     try {
-      await removeDomain(ctx, String(formData.get("domainId") ?? ""));
+      await removeHostname(ctx, String(formData.get("hostnameId") ?? ""));
     } catch (reason) {
       redirect(`/services/${id}?error=${codeOf(reason)}#domains`);
     }
-    redirect(`/services/${id}#domains`);
+    redirect(`/services/${id}?hostname_removed=1#domains`);
   }
 
   async function createLink(formData: FormData) {
     "use server";
     const ctx = await requirePageSession();
+    const domainId = String(formData.get("domainId") ?? "");
+    const label = String(formData.get("label") ?? "").trim();
     try {
+      // The link flow may mint its own hostname: one screen, no round trip.
+      const hostnameId = label
+        ? (await addHostname(ctx, id, { domainId, label })).id
+        : String(formData.get("hostnameId") ?? "");
       await mintLink(ctx, id, {
-        domainId: String(formData.get("domainId") ?? ""),
+        hostnameId,
         brandId: String(formData.get("brandId") ?? ""),
       });
     } catch (reason) {
@@ -184,19 +200,21 @@ export default async function ServiceDetail({
         eyebrow="Service"
         crumbs={[
           { href: "/services", label: "Products & services" },
-          { label: service.serviceType },
+          { label: service.name },
         ]}
-        title={service.serviceType === "chameleon" ? "Chameleon" : service.serviceType}
-        lede="A rotating capture surface. Visitors get a hostname and slug that render the pinned brand, and every submit lands in your vault."
+        title={service.name}
+        lede={`${service.serviceType} · ${service.tier} tier. Visitors get a hostname and slug that render the pinned brand, and every submit lands in your vault.`}
         actions={
           <>
-            <StatusPill status={service.status} />
-            {activeDomains.length > 0 ? (
+            <StatusPill
+              status={service.subscription === "due" ? "past_due" : service.status}
+            />
+            {routable.length > 0 ? (
               <a className="btn sm" href="#links">
-                Create link
+                Create new link
               </a>
             ) : (
-              <a className="btn sm" href="#domains">
+              <a className="btn sm" href="/settings/domains">
                 Add a domain
               </a>
             )}
@@ -298,20 +316,21 @@ export default async function ServiceDetail({
               </p>
             ) : null}
 
-            {activeDomains.length === 0 ? (
+            {hostnames.length === 0 ? (
               <div className="card">
                 <h2>Get to the first link</h2>
                 <ol className="steps" style={{ marginTop: "0.9rem" }}>
                   <li>
-                    <strong>Attach a hostname</strong>
+                    <strong>Verify a domain once</strong>
                     <p className="fine">
-                      Use a subdomain you control, like login.acme.com.
+                      Configuration → Domains. One TXT proof and one wildcard record
+                      covers every hostname you ever create.
                     </p>
                   </li>
                   <li>
-                    <strong>Publish the records</strong>
+                    <strong>Create a hostname</strong>
                     <p className="fine">
-                      One TXT proof and one CNAME, with a copy button per value.
+                      Portal, secure, access — any label under the verified domain.
                     </p>
                   </li>
                   <li>
@@ -360,7 +379,7 @@ export default async function ServiceDetail({
                       <span className="muted">{link.brandName ?? "no brand"}</span>
                       <span className="muted">{shortDate(link.createdAt)}</span>
                       <span className="muted">
-                        {link.domainStatus === "active" ? "routing" : "host not live"}
+                        {link.hostnameStatus === "active" ? "routing" : "host not live"}
                       </span>
                       <div className="actions">
                         <CopyButton
@@ -382,7 +401,7 @@ export default async function ServiceDetail({
                 </div>
               )}
 
-              {activeDomains.length > 0 &&
+              {routable.length > 0 &&
               brands.length > 0 &&
               links.length < service.linkCap ? (
                 <form
@@ -390,15 +409,36 @@ export default async function ServiceDetail({
                   className="inline-form"
                   style={{ marginTop: "0.9rem" }}
                 >
+                  {hostnames.length > 0 ? (
+                    <div className="field">
+                      <label htmlFor="hostnameId">Existing hostname</label>
+                      <select id="hostnameId" name="hostnameId">
+                        {hostnames.map((hostname) => (
+                          <option key={hostname.id} value={hostname.id}>
+                            {hostname.fqdn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                   <div className="field">
-                    <label htmlFor="domainId">Hostname</label>
+                    <label htmlFor="domainId">Domain</label>
                     <select id="domainId" name="domainId" required>
-                      {activeDomains.map((domain) => (
+                      {routable.map((domain) => (
                         <option key={domain.id} value={domain.id}>
-                          {domain.hostname}
+                          {domain.root}
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="label">New hostname (optional)</label>
+                    <input
+                      id="label"
+                      name="label"
+                      placeholder="portal"
+                      autoComplete="off"
+                    />
                   </div>
                   <div className="field">
                     <label htmlFor="brandId">Brand to imitate</label>
@@ -426,66 +466,78 @@ export default async function ServiceDetail({
             <section className="card" id="domains">
               <div className="row">
                 <div>
-                  <h2>Domains</h2>
+                  <h2>Hostnames</h2>
                   <p className="muted">
-                    Each hostname needs an ownership TXT record and a routing record.
-                    Checks retry for 72 hours; the platform never guesses ownership.
+                    Addresses on this service. Domains are verified once under
+                    Configuration → Domains; you never repeat DNS per hostname.
                   </p>
                 </div>
                 <span className="pill idle">
-                  {domains.length} / {service.domainCap}
+                  {hostnames.length} / {service.hostnameCap}
                 </span>
               </div>
 
-              {domains.length === 0 ? (
-                <Empty title="No hostname attached">
-                  A service with no hostname has nowhere to resolve. Add one below to see
-                  the exact records.
+              {hostnames.length === 0 ? (
+                <Empty title="No hostname yet">
+                  Create a link above and pick a verified domain, or add a bare hostname
+                  below to use later.
                 </Empty>
               ) : (
-                <div className="stack">
-                  {domains.map((domain) => (
-                    <div className="card flat" key={domain.id}>
-                      <div className="row" style={{ marginBottom: "0.8rem" }}>
-                        <strong className="mono">{domain.hostname}</strong>
-                        <form action={deleteDomain}>
-                          <input type="hidden" name="domainId" value={domain.id} />
+                <div className="table">
+                  {hostnames.map((hostname) => (
+                    <div className="tr" key={hostname.id}>
+                      <a className="mono" href={`/settings/domains/${hostname.domainId}`}>
+                        {hostname.fqdn}
+                      </a>
+                      <StatusPill status={hostname.status} />
+                      <span className="muted">{shortDate(hostname.createdAt)}</span>
+                      <div className="actions">
+                        <form action={deleteHostname}>
+                          <input type="hidden" name="hostnameId" value={hostname.id} />
                           <ConfirmSubmit
-                            message={`Delete ${domain.hostname}? Its links stop resolving and the name is tombstoned for 30 days.`}
+                            message={`Remove ${hostname.fqdn}? Its links stop resolving and the name is held for 30 days.`}
                           >
-                            Delete
+                            Remove
                           </ConfirmSubmit>
                         </form>
                       </div>
-                      <DnsRecords domain={domain} serviceId={id} />
                     </div>
                   ))}
                 </div>
               )}
 
-              {domains.length < service.domainCap ? (
+              {routable.length === 0 ? (
+                <p className="fine" style={{ marginTop: "0.8rem" }}>
+                  No verified domain yet. <a href="/settings/domains">Add one</a> and it
+                  becomes available to every eligible service.
+                </p>
+              ) : hostnames.length < service.hostnameCap ? (
                 <form
-                  action={addDomain}
+                  action={addHostnameAction}
                   className="inline-form"
                   style={{ marginTop: "0.9rem" }}
                 >
                   <div className="field">
-                    <label htmlFor="hostname">Add a hostname</label>
-                    <input
-                      id="hostname"
-                      name="hostname"
-                      placeholder="login.acme.com"
-                      required
-                    />
-                    <p className="fine">No scheme, no path. Subdomains are simplest.</p>
+                    <label htmlFor="addDomainId">Domain</label>
+                    <select id="addDomainId" name="domainId" required>
+                      {routable.map((domain) => (
+                        <option key={domain.id} value={domain.id}>
+                          {domain.root}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <button type="submit" className="btn">
+                  <div className="field">
+                    <label htmlFor="newLabel">Hostname label</label>
+                    <input id="newLabel" name="label" placeholder="portal" required />
+                  </div>
+                  <button type="submit" className="btn ghost">
                     Add hostname
                   </button>
                 </form>
               ) : (
                 <p className="fine">
-                  Domain cap reached on this tier. Remove one or provision a larger
+                  Hostname cap reached on this tier. Remove one or provision a larger
                   service.
                 </p>
               )}
@@ -604,7 +656,9 @@ export default async function ServiceDetail({
               <dl className="kv">
                 <dt>Status</dt>
                 <dd>
-                  <StatusPill status={service.status} />
+                  <StatusPill
+                    status={service.subscription === "due" ? "past_due" : service.status}
+                  />
                 </dd>
                 <dt>Paid through</dt>
                 <dd>{shortDate(service.paidUntil)}</dd>
@@ -612,9 +666,9 @@ export default async function ServiceDetail({
                 <dd>
                   {links.length} of {service.linkCap}
                 </dd>
-                <dt>Domains</dt>
+                <dt>Hostnames</dt>
                 <dd>
-                  {domains.length} of {service.domainCap}
+                  {hostnames.length} of {service.hostnameCap}
                 </dd>
                 <dt>Captures</dt>
                 <dd>{totalCaptures.total}</dd>

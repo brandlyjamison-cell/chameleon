@@ -10,7 +10,7 @@ export interface LinkView {
   id: string;
   slug: string;
   hostname: string;
-  domainStatus: string;
+  hostnameStatus: string;
   brandName: string | null;
   brandSlug: string | null;
   status: string;
@@ -27,10 +27,10 @@ export interface BrandOption {
 
 const SELECT = `
   select l.id, l.slug, l.status, l.created_at as "createdAt",
-         d.hostname, d.status as "domainStatus",
+         h.fqdn as hostname, h.status as "hostnameStatus",
          b.name as "brandName", b.slug as "brandSlug"
     from links l
-    join domains d on d.id = l.domain_id
+    join hostnames h on h.id = l.hostname_id
     left join brands b on b.id = l.pinned_brand_id
    where l.service_id = $1 and l.deleted_at is null
 `;
@@ -64,10 +64,10 @@ export async function listBrands(): Promise<BrandOption[]> {
 export async function mintLink(
   ctx: Ctx,
   serviceId: string,
-  input: { domainId: string; brandId: string },
+  input: { hostnameId: string; brandId: string },
 ): Promise<LinkView> {
   requireOwner(ctx);
-  if (!input.domainId || !input.brandId) throw invalid("domain_and_brand_required");
+  if (!input.hostnameId || !input.brandId) throw invalid("hostname_and_brand_required");
 
   return asTenant(ctx, async (c) => {
     const service = await c.query<{ status: string }>(
@@ -77,14 +77,14 @@ export async function mintLink(
     if (!service.rows[0]) throw notFound();
     if (service.rows[0].status !== "active") throw conflict("service_not_active");
 
-    const domain = await c.query<{ id: string; status: string }>(
-      `select id, status from domains
+    const hostname = await c.query<{ id: string; status: string }>(
+      `select id, status from hostnames
         where id = $1 and service_id = $2 and deleted_at is null`,
-      [input.domainId, serviceId],
+      [input.hostnameId, serviceId],
     );
-    // Links on a host that does not route yet would be dead on arrival.
-    if (!domain.rows[0]) throw notFound();
-    if (domain.rows[0].status !== "active") throw conflict("domain_not_active");
+    // Links on an address that does not route yet would be dead on arrival.
+    if (!hostname.rows[0]) throw notFound();
+    if (hostname.rows[0].status !== "active") throw conflict("hostname_not_active");
 
     const brand = await c.query<{ id: string }>(
       "select id from brands where id = $1 and enabled",
@@ -97,7 +97,7 @@ export async function mintLink(
       try {
         row = await links.links.mint(c, ctx, {
           serviceId,
-          domainId: input.domainId,
+          hostnameId: input.hostnameId,
           pin: input.brandId,
         });
       } catch (error) {

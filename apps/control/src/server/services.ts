@@ -4,6 +4,7 @@ import type { Ctx } from "@chameleon/db";
 import { orNotFound, withTenant } from "@chameleon/db";
 import type { ActivateSchema, CreateServiceSchema } from "@chameleon/contracts";
 import type { z } from "zod";
+import { defaultServiceName } from "@chameleon/engine";
 import { asTenant, requireDb } from "./db";
 import { conflict, invalid } from "./errors";
 import { createVerifier, derive, verifyPasscode } from "./passcode";
@@ -11,9 +12,15 @@ import { assertPaid } from "./billing";
 import { KEK_KID, newDek, newSecret, unwrapDek, wrapDek } from "./keys";
 import { requireOwner } from "./session";
 
+export type SubscriptionState =
+  "paid" | "due" | "unpaid" | "expired" | "provisioning" | "inactive";
+
 export interface ServiceView {
   id: string;
   status: string;
+  subscription: SubscriptionState;
+  name: string;
+  previewKey: string;
   serviceType: string;
   tier: string;
   gateMode: string;
@@ -23,36 +30,66 @@ export interface ServiceView {
   paidUntil: string | null;
   priceCents: number;
   linkCap: number;
-  domainCap: number;
+  hostnameCap: number;
   linksUsed: number;
-  domainsUsed: number;
+  hostnamesUsed: number;
 }
 
 // Aliases are quoted because the view is camelCase and the row goes straight out.
 const VIEW_SQL = `
-  select s.id, s.status, st.code as "serviceType", t.code as tier,
+  select s.id, s.status, s.name, s.preview_key as "previewKey",
+         st.code as "serviceType", t.code as tier,
          s.gate_mode as "gateMode", s.expires_at as "expiresAt",
          s.activated_at as "activatedAt", s.created_at as "createdAt",
          s.paid_until as "paidUntil", t.price_cents as "priceCents",
-         t.link_cap as "linkCap", t.domain_cap as "domainCap",
-         s.link_slots_used as "linksUsed", s.domain_slots_used as "domainsUsed"
+         t.link_cap as "linkCap", t.hostname_cap as "hostnameCap",
+         s.link_slots_used as "linksUsed", s.hostname_slots_used as "hostnamesUsed"
   from services s
   join service_types st on st.id = s.service_type_id
   join tiers t on t.id = s.tier_id`;
+
+/**
+ * One source of truth for "what is this service, commercially". The header pill,
+ * the payment card and any banner read this, so an active-but-unpaid service can
+ * never present as Active and Payment required at the same time.
+ */
+export function subscriptionState(service: {
+  status: string;
+  paidUntil: string | null;
+  activatedAt: string | null;
+}): SubscriptionState {
+  if (service.status === "archived" || service.status === "suspended") return "inactive";
+  if (service.status === "expired") return "expired";
+  const paid =
+    service.paidUntil !== null && new Date(service.paidUntil).getTime() > Date.now();
+  if (paid) return "paid";
+  if (service.status === "provisioning" || !service.activatedAt) return "provisioning";
+  return "due";
+}
+
+const withSubscription = <
+  T extends { status: string; paidUntil: string | null; activatedAt: string | null },
+>(
+  row: T,
+): T & { subscription: SubscriptionState } => ({
+  ...row,
+  subscription: subscriptionState(row),
+});
 
 export async function listServices(ctx: Ctx): Promise<ServiceView[]> {
   return asTenant(ctx, async (c) => {
     const { rows } = await c.query<ServiceView>(
       `${VIEW_SQL} where true order by s.created_at desc`,
     );
-    return rows;
+    return rows.map(withSubscription);
   });
 }
 
 export async function getService(ctx: Ctx, id: string): Promise<ServiceView> {
   return asTenant(ctx, async (c) => {
     const { rows } = await c.query<ServiceView>(`${VIEW_SQL} where s.id = $1`, [id]);
-    return orNotFound(rows[0]);
+    const row = orNotFound(rows[0]);
+    return withSubscription(row);
   });
 }
 
@@ -74,13 +111,22 @@ export async function createService(
     );
     const tierId = orNotFound(tier.rows[0]).id;
 
-    const { rows } = await c.query<{ id: string }>(
-      `insert into services (org_id, service_type_id, tier_id) values ($1, $2, $3) returning id`,
-      [ctx.orgId, typeId, tierId],
-    );
-    const id = orNotFound(rows[0]).id;
+    const name = input.name?.trim() || defaultServiceName(input.serviceType, input.tier);
+
+    let id: string;
+    try {
+      const { rows } = await c.query<{ id: string }>(
+        `insert into services (org_id, service_type_id, tier_id, name)
+         values ($1, $2, $3, $4) returning id`,
+        [ctx.orgId, typeId, tierId, name],
+      );
+      id = orNotFound(rows[0]).id;
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") throw conflict("name_taken");
+      throw error;
+    }
     const view = await c.query<ServiceView>(`${VIEW_SQL} where s.id = $1`, [id]);
-    return orNotFound(view.rows[0]);
+    return withSubscription(orNotFound(view.rows[0]));
   });
 }
 

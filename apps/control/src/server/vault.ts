@@ -39,13 +39,13 @@ const WHERE = `
 
 const SELECT = `
   select c.id, c.service_id as "serviceId", st.code as "serviceType",
-         l.slug, d.hostname, c.kind, c.source, c.status, c.fields,
+         l.slug, h.fqdn as hostname, c.kind, c.source, c.status, c.fields,
          c.received_at as "receivedAt"
     from captures c
     join services s on s.id = c.service_id
     join service_types st on st.id = s.service_type_id
     left join links l on l.id = c.link_id
-    left join domains d on d.id = l.domain_id
+    left join hostnames h on h.id = l.hostname_id
 `;
 
 function args(filter: VaultFilter): unknown[] {

@@ -13,7 +13,7 @@ export async function POST(req: Request): Promise<Response> {
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
       return json({ error: "forbidden" }, 403);
     }
-    return json(await drain(50));
+    return json(await drain(50, new URL(req.url).searchParams.get("force") === "1"));
   } catch (error) {
     return handleError(error);
   }

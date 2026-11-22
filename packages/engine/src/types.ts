@@ -14,6 +14,8 @@ import type { RenderTemplate } from "@chameleon/skeleton";
  */
 export interface Engine {
   readonly code: ServiceTypeCode;
+  /** Human product name, used when a tenant does not name a service. */
+  readonly label: string;
   /** What this engine may ever store. chameleon: ['credential'] only (INV-CAP-03). */
   readonly captureKinds: readonly CaptureKind[];
   readonly defaultKind: CaptureKind;

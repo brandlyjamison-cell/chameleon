@@ -1,16 +1,30 @@
 import { requireDb } from "../../../server/db";
-import { mailStats, warnIfStale } from "../../../server/mailqueue";
+import { mailLimits } from "../../../server/mail";
+import { mailStats, quotaSpent, warnIfStale } from "../../../server/mailqueue";
 
 export const dynamic = "force-dynamic";
 
-/** Real dependency check, not a static 200. Backlog is reported, not fatal. */
+/** Real dependency check, not a static 200. Backlog and quota are reported, not fatal. */
 export async function GET(): Promise<Response> {
   try {
     await requireDb().pool.query("select 1");
     const mail = await mailStats();
-    warnIfStale(mail);
+    const quota = await mailLimits();
+    warnIfStale(mail, quota);
     return Response.json(
-      { ok: true, db: true, mail },
+      {
+        ok: true,
+        db: true,
+        mail: { ...mail, parked: quotaSpent(quota) },
+        quota: quota
+          ? {
+              sent: quota.sent,
+              limit: quota.quota,
+              overQuota: quota.overQuota,
+              resetsAt: quota.resetsAt,
+            }
+          : null,
+      },
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

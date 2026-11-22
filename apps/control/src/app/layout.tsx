@@ -82,25 +82,7 @@ function Sidebar({
           <NavLink href="/settings/forwarding" sub>
             Forwarding
           </NavLink>
-          <NavLink href="/settings/delivery" sub>
-            Mail delivery
-          </NavLink>
         </div>
-
-        {session.isAdmin ? (
-          <div className="navgroup">
-            <span className="navlabel">Platform</span>
-            <NavLink href="/admin" exact>
-              Operator panel
-            </NavLink>
-            <NavLink href="/admin/mail" sub>
-              Mail queue
-            </NavLink>
-            <NavLink href="/admin/audit" sub>
-              Audit log
-            </NavLink>
-          </div>
-        ) : null}
       </nav>
 
       <span className="spacer" />
@@ -109,6 +91,11 @@ function Sidebar({
         <span className="who" title={session.email}>
           {session.email}
         </span>
+        {session.isAdmin ? (
+          <a className="navitem" href="/admin">
+            Operator panel
+          </a>
+        ) : null}
         <a className="navitem" href="/account">
           Account
         </a>

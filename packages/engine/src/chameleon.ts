@@ -7,6 +7,7 @@ import type { Engine } from "./types";
  * the provider never sends the victim a code (INV-CAP-04).
  */
 export const chameleon: Engine = {
+  label: "Chameleon",
   code: "chameleon",
   captureKinds: ["credential"],
   defaultKind: "credential",

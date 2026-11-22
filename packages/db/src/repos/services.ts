@@ -10,11 +10,11 @@ export interface ServiceRow {
   expires_at: Date | null;
   gate_mode: string;
   link_slots_used: number;
-  domain_slots_used: number;
+  hostname_slots_used: number;
 }
 
 const COLUMNS = `id, org_id, service_type_id, tier_id, status, expires_at, gate_mode,
-  link_slots_used, domain_slots_used`;
+  link_slots_used, hostname_slots_used`;
 
 export async function list(c: pg.PoolClient, _ctx: Ctx): Promise<ServiceRow[]> {
   const { rows } = await c.query<ServiceRow>(
@@ -39,13 +39,13 @@ export async function lockWithCaps(
   status: string;
   activated_at: Date | null;
   link_cap: number;
-  domain_cap: number;
+  hostname_cap: number;
   link_slots_used: number;
-  domain_slots_used: number;
+  hostname_slots_used: number;
 }> {
   const { rows } = await c.query(
-    `select s.status, s.activated_at, t.link_cap, t.domain_cap,
-            s.link_slots_used, s.domain_slots_used
+    `select s.status, s.activated_at, t.link_cap, t.hostname_cap,
+            s.link_slots_used, s.hostname_slots_used
      from services s join tiers t on t.id = s.tier_id
      where s.id = $1 for update of s`,
     [serviceId],
@@ -53,7 +53,7 @@ export async function lockWithCaps(
   return orNotFound(rows[0]);
 }
 
-export function assertFree(slot: "link" | "domain", used: number, cap: number): void {
+export function assertFree(slot: "link" | "hostname", used: number, cap: number): void {
   if (used >= cap) throw new CapError(slot);
 }
 

@@ -11,7 +11,7 @@ export interface Seed {
   userId: string;
   serviceId: string;
   otherServiceId: string;
-  domainId: string;
+  hostnameId: string;
   linkId: string;
 }
 
@@ -57,10 +57,10 @@ export async function reset(): Promise<void> {
   // truncate locks. A delete is RowExclusive and composes.
   await migrator.query("delete from rate_limits");
   await migrator.query(
-    `update tiers set link_cap = 5, domain_cap = 2, capture_cap = 50000 where id in (1, 3)`,
+    `update tiers set link_cap = 5, hostname_cap = 2, capture_cap = 50000 where id in (1, 3)`,
   );
   await migrator.query(
-    `update tiers set link_cap = 20, domain_cap = 5, capture_cap = 250000 where id in (2, 4)`,
+    `update tiers set link_cap = 20, hostname_cap = 5, capture_cap = 250000 where id in (2, 4)`,
   );
 }
 
@@ -89,28 +89,34 @@ export async function seed(): Promise<Seed> {
   );
 
   const service = await admin.query<{ id: string }>(
-    `insert into services (org_id, service_type_id, tier_id, status, expires_at)
-     values ($1, 1, 1, 'active', now() + interval '30 days') returning id`,
-    [orgId],
+    `insert into services (org_id, service_type_id, tier_id, status, expires_at, name)
+     values ($1, 1, 1, 'active', now() + interval '30 days', $2) returning id`,
+    [orgId, `svc ${n}`],
   );
   const otherService = await admin.query<{ id: string }>(
-    `insert into services (org_id, service_type_id, tier_id, status, expires_at)
-     values ($1, 1, 2, 'active', now() + interval '30 days') returning id`,
-    [otherOrgId],
+    `insert into services (org_id, service_type_id, tier_id, status, expires_at, name)
+     values ($1, 1, 2, 'active', now() + interval '30 days', $2) returning id`,
+    [otherOrgId, `other ${n}`],
   );
   const serviceId = service.rows[0]!.id;
   const otherServiceId = otherService.rows[0]!.id;
 
   const domain = await admin.query<{ id: string }>(
-    `insert into domains (org_id, service_id, hostname, verify_token, status, verified_at, verified_by)
-     values ($1, $2, $3, 'tok', 'active', now(), 'txt') returning id`,
-    [orgId, serviceId, `d${n}.example.test`],
+    `insert into org_domains (org_id, root, status, verified_at, verified_by)
+     values ($1, $2, 'active', now(), 'txt') returning id`,
+    [orgId, `d${n}.example.test`],
   );
   const domainId = domain.rows[0]!.id;
+  const host = await admin.query<{ id: string }>(
+    `insert into hostnames (org_id, domain_id, service_id, fqdn, label, verify_token, status, verified_at)
+     values ($1, $2, $3, $4, $5, 'tok', 'active', now()) returning id`,
+    [orgId, domainId, serviceId, `login.d${n}.example.test`, "login"],
+  );
+  const hostnameId = host.rows[0]!.id;
 
   const link = await admin.query<{ id: string }>(
-    `insert into links (org_id, service_id, domain_id, slug) values ($1, $2, $3, $4) returning id`,
-    [orgId, serviceId, domainId, `A${String(n).padStart(4, "0")}`],
+    `insert into links (org_id, service_id, hostname_id, slug) values ($1, $2, $3, $4) returning id`,
+    [orgId, serviceId, hostnameId, `A${String(n).padStart(4, "0")}`],
   );
 
   return {
@@ -119,7 +125,7 @@ export async function seed(): Promise<Seed> {
     userId,
     serviceId,
     otherServiceId,
-    domainId,
+    hostnameId,
     linkId: link.rows[0]!.id,
   };
 }
