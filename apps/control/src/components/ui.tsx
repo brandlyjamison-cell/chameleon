@@ -28,6 +28,9 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   valid: { label: "Valid", tone: "ok" },
   invalid: { label: "Invalid", tone: "bad" },
   verified: { label: "Verified", tone: "ok" },
+  generated: { label: "Needs review", tone: "warn" },
+  accepted: { label: "Accepted", tone: "ok" },
+  rejected: { label: "Rejected", tone: "idle" },
 };
 
 /** Status is data, so the tone map lives in one place. */

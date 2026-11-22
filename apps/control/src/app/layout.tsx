@@ -68,13 +68,13 @@ function Sidebar({
 
         <div className="navgroup">
           <span className="navlabel">Data</span>
-          <NavLink href="/vault">Capture vault</NavLink>
+          <NavLink href="/vault">Vault</NavLink>
         </div>
 
         <div className="navgroup">
-          <span className="navlabel">Configuration</span>
-          <NavLink href="/settings" exact>
-            Organisation
+          <span className="navlabel">Organization</span>
+          <NavLink href="/settings" exact sub>
+            General
           </NavLink>
           <NavLink href="/settings/domains" sub>
             Domains
@@ -91,11 +91,6 @@ function Sidebar({
         <span className="who" title={session.email}>
           {session.email}
         </span>
-        {session.isAdmin ? (
-          <a className="navitem" href="/admin">
-            Operator panel
-          </a>
-        ) : null}
         <a className="navitem" href="/account">
           Account
         </a>

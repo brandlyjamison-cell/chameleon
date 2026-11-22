@@ -37,24 +37,30 @@ export const ActivateSchema = z.object({
 export interface ServiceView {
   id: string;
   status: string;
+  name: string;
+  /** Scopes the free preview path; never a secret, never reused. */
+  previewKey: string;
+  /** The preview link's slug, null until it is minted. */
+  previewSlug: string | null;
   serviceType: string;
   tier: string;
   gateMode: string;
-  emailVerified: boolean;
   expiresAt: string | null;
   activatedAt: string | null;
   createdAt: string;
   paidUntil: string | null;
   priceCents: number;
   linkCap: number;
-  domainCap: number;
+  hostnameCap: number;
   linksUsed: number;
-  domainsUsed: number;
+  hostnamesUsed: number;
 }
 
 export const SERVICE_VIEW_FIELDS = [
   "id",
   "status",
+  "name",
+  "preview_key",
   "service_type",
   "tier",
   "gate_mode",

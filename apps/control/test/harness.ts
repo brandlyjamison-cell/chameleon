@@ -8,6 +8,7 @@ export const BASE = process.env.SERVER_URL ?? "http://localhost:3100";
 export interface Agent {
   cookies: string[];
   post(path: string, form?: Record<string, string>): Promise<Response>;
+  postJson(path: string, body: unknown): Promise<Response>;
   get(path: string): Promise<Response>;
 }
 
@@ -32,6 +33,14 @@ export function agent(): Agent {
         self.cookies.push(pair);
       }
       return res;
+    },
+    async postJson(path, body) {
+      return fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: self.cookies.join("; "), "content-type": "application/json" },
+        body: JSON.stringify(body),
+        redirect: "manual",
+      });
     },
     async get(path) {
       return fetch(`${BASE}${path}`, {

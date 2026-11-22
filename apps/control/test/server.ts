@@ -19,6 +19,25 @@ export const invoices: Record<string, unknown>[] = [];
 const paymentState = new Map<string, { status: string | null; price?: number }>();
 let child: ChildProcess | undefined;
 
+/** What the clone stub returns: a two-form page with a logo and a brand colour. */
+const CLONE_HTML = `<!doctype html><html><head><title>Acme Sign In</title>
+<meta name="theme-color" content="#0a5c36">
+<link rel="icon" href="https://cdn.example.test/logo.png">
+<style>body{background:#f6f6f6;color:#111}</style></head>
+<body><form action="https://acme.example.test/session" method="post">
+<h1>Sign in to Acme</h1><label for="email">Work email</label>
+<input id="email" type="email" name="email" placeholder="you@acme.test">
+<button type="submit" class="btn">Continue</button></form>
+<form><label for="password">Your password</label>
+<input id="password" type="password" name="password">
+<button type="submit">Sign in</button></form></body></html>`;
+
+/** 1x1 transparent PNG; the tests only need bytes with an image content type. */
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 function startUpstream(): Promise<void> {
   upstream = createServer((req, res) => {
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${UPSTREAM}`);
@@ -43,6 +62,16 @@ function startUpstream(): Promise<void> {
         txt.set(body.name, body.records);
         send(200, { ok: true });
       });
+    }
+    // Browser Rendering: one canned login page, one 1x1 PNG.
+    if (url.pathname === "/client/v4/accounts/test-account/browser-rendering/content") {
+      return send(200, { success: true, result: CLONE_HTML });
+    }
+    if (
+      url.pathname === "/client/v4/accounts/test-account/browser-rendering/screenshot"
+    ) {
+      res.writeHead(200, { "content-type": "image/png" });
+      return res.end(PNG);
     }
     if (url.pathname === "/_invoices") {
       return send(200, invoices);
@@ -156,6 +185,7 @@ export async function setup(): Promise<void> {
   process.env.CF_API_BASE = `http://127.0.0.1:${UPSTREAM}/client/v4`;
   process.env.CLOUDFLARE_API_KEY = "test-token";
   process.env.CLOUDFLARE_ZONE_ID = "test-zone";
+  process.env.CLOUDFLARE_ACCOUNT_ID = "test-account";
   process.env.JOBS_TOKEN = "test-job-token";
   process.env.NOWPAYMENTS_API_BASE = `http://127.0.0.1:${UPSTREAM}/v1`;
   process.env.NOWPAYMENTS_API_KEY = "test-key";

