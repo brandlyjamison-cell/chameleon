@@ -311,3 +311,12 @@ In-flight workers hold connections. Lean: revoke, wait 60s, then confirm.
 - Anything in `arch/aitm-service.md`'s "later" list.
 
 Last reviewed: 2026-11-20
+
+## OPEN-MAIL-02 — fallback provider for throttled recipients
+
+Cloudflare Email Sending answers `429 10004` for mailinator-style catch-all
+domains and parks the row for 15 minutes; Proton addresses accept. A second
+provider needs an operator key (`MAIL_FALLBACK_*`) and a selection rule: use it
+after the first throttle on the same domain, never in parallel with Cloudflare for
+the same row, or every tenant pays twice. Until then the queue is correct but a
+throttled domain can wait a quarter of an hour per attempt.
