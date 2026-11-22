@@ -23,7 +23,7 @@ export default async function Account() {
             {session.emailVerified ? (
               <StatusPill status="verified" />
             ) : (
-              <StatusPill status="pending" />
+              <span className="pill warn">Unconfirmed</span>
             )}
           </dd>
           <dt>Role</dt>

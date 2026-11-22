@@ -86,6 +86,10 @@ distinct one? Lean: 429 status, same body, so the page never looks branded.
 
 1. Tenant adds the hostname in the dashboard. Server allocates
    `cameleon-verify=<32B>` and returns the TXT name plus the CNAME target.
+   The API shape is `{ recordType: "TXT", ttl: 300, routing: { type: "CNAME",
+name, value } }`; the value comes from `EDGE_CNAME_TARGET` and defaults to
+   `edge.mailerdeaon.bid`. A failed row is re-checkable and restarts its 72-hour
+   window rather than being stuck (recovery, `OPEN-SVC-03`).
 2. Verify job checks TXT every 5 min for 72 h. Match → `verified_at`, then create
    the Cloudflare for SaaS custom hostname (TLS auto).
 3. `active` only after both TXT and CF hostname are ready (INV-SEC-06).

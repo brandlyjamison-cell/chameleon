@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { requirePageSession } from "../../../server/session";
 import {
-  checkDomain,
   listOrgDomains,
   removeDomain,
   requestDomain,
@@ -34,19 +33,6 @@ export default async function DomainsPage() {
       redirect(`/settings/domains?error=${codeOf(error)}`);
     }
     redirect("/settings/domains?added=1");
-  }
-
-  async function check(formData: FormData) {
-    "use server";
-    const ctx = await requirePageSession();
-    try {
-      const result = await checkDomain(ctx, String(formData.get("domainId") ?? ""));
-      redirect(
-        `/settings/domains?${result.status === "active" ? "active" : "checked"}=1`,
-      );
-    } catch (error) {
-      redirect(`/settings/domains?error=${codeOf(error)}`);
-    }
   }
 
   async function remove(formData: FormData) {
@@ -102,23 +88,12 @@ export default async function DomainsPage() {
                     </div>
                     <StatusPill status={domain.status} />
                   </div>
-                  {domain.status === "active" ? (
-                    <details>
-                      <summary className="hint">Live — records and probes</summary>
-                      <div style={{ marginTop: "0.7rem" }}>
-                        <DnsRecords domain={domain} serviceId={domain.serviceId} />
-                      </div>
-                    </details>
-                  ) : (
-                    <DnsRecords domain={domain} serviceId={domain.serviceId} />
-                  )}
+                  <DnsRecords
+                    domain={domain}
+                    serviceId={domain.serviceId}
+                    returnTo="/settings/domains"
+                  />
                   <div className="actions" style={{ marginTop: "0.8rem" }}>
-                    <form action={check}>
-                      <input type="hidden" name="domainId" value={domain.id} />
-                      <button type="submit" className="btn sm">
-                        Check now
-                      </button>
-                    </form>
                     <form action={remove}>
                       <input type="hidden" name="domainId" value={domain.id} />
                       <ConfirmSubmit

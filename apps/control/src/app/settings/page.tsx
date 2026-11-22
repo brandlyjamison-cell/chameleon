@@ -26,7 +26,7 @@ export default async function Settings() {
   return (
     <main className="app narrow" id="content">
       <PageHeader
-        crumbs={[{ href: "/dashboard", label: "Overview" }, { label: "Configuration" }]}
+        crumbs={[{ label: "Configuration" }, { label: "Organisation" }]}
         title="Organisation"
         lede="The tenant-wide settings. Service behaviour, domains and credentials live under their own surfaces."
       />
@@ -67,10 +67,11 @@ export default async function Settings() {
               defaultChecked={org.settings.notifyOnCapture}
             />
             <span>
-              <strong>Mail me when a capture lands</strong>
+              <strong>Allow capture mail</strong>
               <span className="fine">
                 {" "}
-                Sends through verified forwarding addresses. Off keeps the vault quiet.
+                Eligible captures can be mailed to verified addresses, and the edge ingest
+                reads this later. Off keeps the vault quiet.
               </span>
             </span>
           </label>

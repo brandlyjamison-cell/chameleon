@@ -31,9 +31,11 @@ function explain(domain: DomainView): string | null {
 export function DnsRecords({
   domain,
   serviceId,
+  returnTo,
 }: {
   domain: DomainView;
   serviceId: string;
+  returnTo?: string;
 }) {
   const record = [
     `Type: ${domain.recordType}`,
@@ -96,6 +98,11 @@ export function DnsRecords({
 
       <div className="actions">
         <form action={`/api/domains/${domain.id}/check`} method="post">
+          <input
+            type="hidden"
+            name="returnTo"
+            value={returnTo ?? `/services/${serviceId}#domains`}
+          />
           <button type="submit" className="btn sm">
             Check now
           </button>
