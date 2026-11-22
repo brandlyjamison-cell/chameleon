@@ -163,8 +163,9 @@ export default async function Dashboard() {
               <div className="card">
                 <h2>Mail</h2>
                 <p className="fine">
-                  Queued {mail.filter((row) => row.status === "queued").length}, failed{" "}
-                  {failedMail.length}, in the last {mail.length} rows.
+                  {mail.length === 0
+                    ? "No mail queued for this org yet."
+                    : `Queued ${mail.filter((row) => row.status === "queued").length}, failed ${failedMail.length} in the latest ${mail.length}.`}
                 </p>
                 <a className="btn ghost sm" href="/settings/delivery">
                   Delivery status
