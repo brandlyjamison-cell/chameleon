@@ -7,7 +7,6 @@ import { latestPayment } from "../../../server/billing";
 import { addAddress, listAddresses } from "../../../server/forwards";
 import { activateIn, getService } from "../../../server/services";
 import {
-  checkDomain,
   listDomains,
   removeDomain,
   requestDomain,
@@ -130,19 +129,6 @@ export default async function ServiceDetail({
       redirect(`/services/${id}?error=${codeOf(reason)}#domains`);
     }
     redirect(`/services/${id}?domain_added=1#domains`);
-  }
-
-  async function verifyDomain(formData: FormData) {
-    "use server";
-    const ctx = await requirePageSession();
-    try {
-      const result = await checkDomain(ctx, String(formData.get("domainId") ?? ""));
-      redirect(
-        `/services/${id}?${result.status === "active" ? "domain_active" : "domain_checked"}=1#domains`,
-      );
-    } catch (reason) {
-      redirect(`/services/${id}?error=${codeOf(reason)}#domains`);
-    }
   }
 
   async function deleteDomain(formData: FormData) {
@@ -471,26 +457,7 @@ export default async function ServiceDetail({
                           </ConfirmSubmit>
                         </form>
                       </div>
-                      {domain.status === "active" ? (
-                        <details>
-                          <summary className="hint">
-                            Live — show the records and verification state
-                          </summary>
-                          <div style={{ marginTop: "0.8rem" }}>
-                            <DnsRecords domain={domain} serviceId={id} />
-                          </div>
-                        </details>
-                      ) : (
-                        <DnsRecords domain={domain} serviceId={id} />
-                      )}
-                      <div className="actions" style={{ marginTop: "0.8rem" }}>
-                        <form action={verifyDomain}>
-                          <input type="hidden" name="domainId" value={domain.id} />
-                          <button type="submit" className="btn sm">
-                            Check now
-                          </button>
-                        </form>
-                      </div>
+                      <DnsRecords domain={domain} serviceId={id} />
                     </div>
                   ))}
                 </div>

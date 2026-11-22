@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { requirePageSession } from "../../server/session";
 import { listServices } from "../../server/services";
 import { getOrg } from "../../server/account";
@@ -19,8 +18,6 @@ export default async function Dashboard() {
   const mail = await listOrgQueue(session, 5).catch(() => []);
   const failedMail = mail.filter((row) => row.status === "failed");
 
-  if (!session.emailVerified) redirect("/welcome");
-
   const live = services.filter((service) => service.status === "active");
   const unpaid = services.filter(
     (service) =>
@@ -31,7 +28,7 @@ export default async function Dashboard() {
     <main className="app" id="content">
       <PageHeader
         eyebrow={org.name}
-        title={session.emailVerified ? `Welcome back` : "Welcome"}
+        title={session.emailVerified ? "Welcome back" : "Welcome"}
         lede="The state of your services, captures and anything that needs attention."
         actions={
           <>
@@ -59,6 +56,13 @@ export default async function Dashboard() {
         </Empty>
       ) : (
         <div className="stack">
+          {!session.emailVerified ? (
+            <p className="note warn">
+              Confirm <strong>{session.email}</strong> before activating a service.{" "}
+              <a href="/welcome">Resend the link</a>.
+            </p>
+          ) : null}
+
           {unpaid.length > 0 ? (
             <p className="note warn">
               {unpaid.length === 1 ? "One service has" : `${unpaid.length} services have`}{" "}

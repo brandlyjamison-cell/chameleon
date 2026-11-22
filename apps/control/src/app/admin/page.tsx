@@ -137,7 +137,7 @@ export default async function Admin() {
             <div className="tr" key={service.serviceId}>
               <a href={`/admin/${service.serviceId}`}>
                 <strong>{service.orgName}</strong>
-                <span className="muted"> {service.ownerEmail ?? "no owner"}</span>
+                <div className="fine">{service.ownerEmail ?? "no owner"}</div>
               </a>
               <StatusPill status={service.status} />
               <span className="muted">{service.tier}</span>
@@ -164,11 +164,15 @@ export default async function Admin() {
 
       <section className="section">
         <h2>Orgs</h2>
-        <div className="table">
+        <div className="table orgs">
           {orgs.map((org) => (
             <div className="tr" key={org.orgId}>
-              <strong>{org.orgName}</strong>
-              <span className="muted">{org.ownerEmail ?? "no owner"}</span>
+              <div>
+                <strong>{org.orgName}</strong>
+                <div className="fine" title={org.ownerEmail ?? undefined}>
+                  {org.ownerEmail ?? "no owner"}
+                </div>
+              </div>
               <span className="muted">{org.services} services</span>
               <span className="muted">{org.captures} captures</span>
               <span className="muted">${(org.paid / 100).toFixed(2)} paid</span>

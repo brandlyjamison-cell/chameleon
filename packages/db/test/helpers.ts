@@ -35,10 +35,27 @@ export async function disconnect(): Promise<void> {
   await Promise.all([migrator?.end(), appRw?.end(), edgeRo?.end(), admin?.end()]);
 }
 
+/** One retry on deadlock: the app is live while the suite resets. */
+async function retrying<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if ((error as { code?: string }).code !== "40P01") throw error;
+    await new Promise((done) => setTimeout(done, 300));
+    return fn();
+  }
+}
+
 export async function reset(): Promise<void> {
-  await migrator.query(
-    "truncate auth_session, auth_verification, auth_account, auth_user, orgs, users, brands, audit_log, outbox, idempotency, webhook_events, rate_limits restart identity cascade",
+  await retrying(() =>
+    migrator.query(
+      "truncate auth_session, auth_verification, auth_account, auth_user, orgs, users, brands, audit_log, outbox, idempotency, webhook_events restart identity cascade",
+    ),
   );
+  // `rate_limits` is written by the running app on every login, so truncating it
+  // (AccessExclusive) deadlocks against a concurrent request under the other
+  // truncate locks. A delete is RowExclusive and composes.
+  await migrator.query("delete from rate_limits");
   await migrator.query(
     `update tiers set link_cap = 5, domain_cap = 2, capture_cap = 50000 where id in (1, 3)`,
   );
