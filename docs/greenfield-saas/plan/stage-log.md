@@ -169,3 +169,12 @@ guidance, org settings, tenant delivery view, admin audit log. Payment handling 
 trusts the provider API rather than the callback body, and a partial or mispriced
 payment holds instead of crediting. Rate limits are DB-backed and a sweep moves
 lapsed services to `past_due` then `expired`.
+
+Deploy 11/12 follow-up (2026-11-22): first live screenshot pass against the white
+console. DNS records were behind a `details` toggle on a live host and now sit
+open with per-field copy; "Check now" returns the page (303) instead of dumping
+JSON to a form post, while fetch keeps the JSON. Admin tables truncate long owner
+addresses with ellipsis instead of colliding. QA found the unconfirmed-email
+banner gated behind having a service and the welcome header labelling the address
+as a DNS state; both fixed and re-proven. The suite now retries a test once —
+it truncates under a live server and a lock deadlock should not block a merge.
