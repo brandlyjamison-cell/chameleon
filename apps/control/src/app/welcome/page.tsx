@@ -22,7 +22,13 @@ export default async function Welcome({
             ? "The address is confirmed. Create a service, pick a tier and set its vault passcode."
             : "We sent a confirmation link. You can build now, but activation waits for the address."
         }
-        actions={<StatusPill status={session.emailVerified ? "verified" : "pending"} />}
+        actions={
+          session.emailVerified ? (
+            <StatusPill status="verified" />
+          ) : (
+            <span className="pill warn">Unconfirmed</span>
+          )
+        }
       />
 
       {error ? (

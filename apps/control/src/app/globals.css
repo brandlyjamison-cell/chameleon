@@ -653,7 +653,7 @@ input[type="checkbox"] {
 @media (max-width: 820px) {
   .tr,
   .table.orgs .tr {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .tr.head {
