@@ -1,6 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdminPage } from "../../../server/session";
-import { extendDays, serviceDetail, setNote, setStatus } from "../../../server/admin";
+import {
+  extendDays,
+  recentAudit,
+  serviceDetail,
+  setNote,
+  setStatus,
+} from "../../../server/admin";
+import { PageHeader, StatusPill, shortTime } from "../../../components/ui";
 
 export default async function AdminService({
   params,
@@ -11,6 +18,8 @@ export default async function AdminService({
   const session = await requireAdminPage();
   const service = await serviceDetail(session, id);
   if (!service) notFound();
+  const audit = await recentAudit(session, 100);
+  const mine = audit.filter((row) => row.targetId === id);
 
   async function extend(formData: FormData) {
     "use server";
@@ -36,84 +45,124 @@ export default async function AdminService({
 
   return (
     <main className="app" id="content">
-      <p className="eyebrow">
-        <a href="/admin">admin</a> / service
-      </p>
-      <h1>{service.orgName}</h1>
-      <p className="muted">{service.serviceId}</p>
+      <PageHeader
+        eyebrow="Platform"
+        crumbs={[{ href: "/admin", label: "Operator panel" }, { label: service.orgName }]}
+        title={service.orgName}
+        lede={`Service ${service.serviceId}`}
+        actions={
+          <>
+            <StatusPill status={service.status} />
+            <a className="btn ghost sm" href={`/services/${service.serviceId}`}>
+              Tenant view
+            </a>
+          </>
+        }
+      />
 
-      <div className="card">
-        <div className="row">
-          <span>owner</span>
-          <span>{service.ownerEmail ?? "none"}</span>
-        </div>
-        <div className="row">
-          <span>status</span>
-          <strong>{service.status}</strong>
-        </div>
-        <div className="row">
-          <span>tier</span>
-          <span>{service.tier}</span>
-        </div>
-        <div className="row">
-          <span>paid through</span>
-          <span>
-            {service.paidUntil ? new Date(service.paidUntil).toLocaleString() : "unpaid"}
-          </span>
-        </div>
-        <div className="row">
-          <span>expires</span>
-          <span>
-            {service.expiresAt ? new Date(service.expiresAt).toLocaleString() : "—"}
-          </span>
-        </div>
-        <div className="row">
-          <span>captures</span>
-          <span>{service.captures}</span>
-        </div>
-      </div>
-
-      <h2>Comp time</h2>
-      <form action={extend}>
-        <label>
-          Days to add
-          <input name="days" type="number" min={1} max={365} defaultValue={30} />
-        </label>
-        <button type="submit">Extend paid period</button>
-      </form>
-
-      <h2>Status</h2>
-      <div className="actions">
-        {(["active", "suspended", "archived", "provisioning"] as const).map((value) => (
-          <form action={status} key={value}>
-            <input type="hidden" name="status" value={value} />
-            <button type="submit" className="ghost">
-              {value}
-            </button>
-          </form>
-        ))}
-      </div>
-
-      <h2>Note</h2>
-      <form action={note}>
-        <textarea name="note" rows={3} defaultValue={service.adminNote ?? ""} />
-        <button type="submit">Save note</button>
-      </form>
-
-      <h2>Payments</h2>
-      <div className="table">
-        {service.payments.map((payment) => (
-          <div className="tr" key={payment.id}>
-            <span>{payment.status}</span>
-            <span>${(payment.price / 100).toFixed(2)}</span>
-            <span className="mono muted">{payment.provider ?? "—"}</span>
-            <span className="muted">{new Date(payment.created).toLocaleString()}</span>
-            <span className="muted">
-              to {new Date(payment.periodEnd).toLocaleDateString()}
-            </span>
+      <div className="split">
+        <div>
+          <div className="card">
+            <h2>Facts</h2>
+            <dl className="kv">
+              <dt>Owner</dt>
+              <dd>{service.ownerEmail ?? "none"}</dd>
+              <dt>Tier</dt>
+              <dd>{service.tier}</dd>
+              <dt>Paid through</dt>
+              <dd>{service.paidUntil ? shortTime(service.paidUntil) : "unpaid"}</dd>
+              <dt>Activation clock</dt>
+              <dd>{service.expiresAt ? shortTime(service.expiresAt) : "—"}</dd>
+              <dt>Captures</dt>
+              <dd>{service.captures}</dd>
+            </dl>
           </div>
-        ))}
-        {service.payments.length === 0 && <p className="muted">No payments yet.</p>}
+
+          <div className="card">
+            <h2>Comp time</h2>
+            <form action={extend} className="inline-form">
+              <div className="field">
+                <label htmlFor="days">Days to add</label>
+                <input
+                  id="days"
+                  name="days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  defaultValue={30}
+                />
+              </div>
+              <button type="submit" className="btn">
+                Extend paid period
+              </button>
+            </form>
+            <p className="fine">
+              Comp is written to the payment ledger as an operator action and is audited.
+            </p>
+          </div>
+
+          <div className="card">
+            <h2>Status</h2>
+            <div className="actions">
+              {(["active", "suspended", "archived", "provisioning"] as const).map(
+                (value) => (
+                  <form action={status} key={value}>
+                    <input type="hidden" name="status" value={value} />
+                    <button type="submit" className="btn ghost sm">
+                      {value}
+                    </button>
+                  </form>
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>Note</h2>
+            <form action={note}>
+              <textarea name="note" rows={3} defaultValue={service.adminNote ?? ""} />
+              <button type="submit" className="btn" style={{ marginTop: "0.6rem" }}>
+                Save note
+              </button>
+            </form>
+          </div>
+
+          <div className="card">
+            <h2>Payments</h2>
+            <div className="table">
+              {service.payments.map((payment) => (
+                <div className="tr" key={payment.id}>
+                  <StatusPill status={payment.status} />
+                  <span>${(payment.price / 100).toFixed(2)}</span>
+                  <span className="mono muted">{payment.provider ?? "—"}</span>
+                  <span className="muted">{shortTime(payment.created)}</span>
+                  <span className="muted">to {shortTime(payment.periodEnd)}</span>
+                  <span />
+                </div>
+              ))}
+              {service.payments.length === 0 && <p className="muted">No payments yet.</p>}
+            </div>
+          </div>
+        </div>
+
+        <aside className="card">
+          <h2>Audit for this service</h2>
+          {mine.length === 0 ? (
+            <p className="muted">No operator action recorded yet.</p>
+          ) : (
+            <div className="stack">
+              {mine.map((row) => (
+                <div key={row.id}>
+                  <strong className="mono">{row.action}</strong>
+                  <div className="fine">{shortTime(row.createdAt)}</div>
+                  {row.detail ? (
+                    <div className="fine mono">{JSON.stringify(row.detail)}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
       </div>
     </main>
   );

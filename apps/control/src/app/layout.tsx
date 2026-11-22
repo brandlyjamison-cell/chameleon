@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { currentSession } from "../server/session";
+import { NavLink, NavToggle } from "../components/shell";
 import "./globals.css";
 
 // Every page reads the session cookie.
@@ -36,6 +37,91 @@ const mark = (
   </svg>
 );
 
+function Sidebar({
+  session,
+}: {
+  session: NonNullable<Awaited<ReturnType<typeof currentSession>>>;
+}) {
+  return (
+    <aside className="sidebar" id="sidebar" aria-label="Main">
+      <a href="/dashboard" className="brand">
+        {mark}
+        chameleon
+      </a>
+
+      <nav>
+        <div className="navgroup">
+          <NavLink href="/dashboard" exact>
+            Overview
+          </NavLink>
+        </div>
+
+        <div className="navgroup">
+          <span className="navlabel">Products &amp; services</span>
+          <NavLink href="/services" exact>
+            All services
+          </NavLink>
+          <NavLink href="/services/new" sub>
+            New service
+          </NavLink>
+        </div>
+
+        <div className="navgroup">
+          <span className="navlabel">Data</span>
+          <NavLink href="/vault">Capture vault</NavLink>
+        </div>
+
+        <div className="navgroup">
+          <span className="navlabel">Configuration</span>
+          <NavLink href="/settings" exact>
+            Organisation
+          </NavLink>
+          <NavLink href="/settings/domains" sub>
+            Domains
+          </NavLink>
+          <NavLink href="/settings/forwarding" sub>
+            Forwarding
+          </NavLink>
+          <NavLink href="/settings/delivery" sub>
+            Mail delivery
+          </NavLink>
+        </div>
+
+        {session.isAdmin ? (
+          <div className="navgroup">
+            <span className="navlabel">Platform</span>
+            <NavLink href="/admin" exact>
+              Operator panel
+            </NavLink>
+            <NavLink href="/admin/mail" sub>
+              Mail queue
+            </NavLink>
+            <NavLink href="/admin/audit" sub>
+              Audit log
+            </NavLink>
+          </div>
+        ) : null}
+      </nav>
+
+      <span className="spacer" />
+
+      <div className="sidefoot">
+        <span className="who" title={session.email}>
+          {session.email}
+        </span>
+        <a className="navitem" href="/account">
+          Account
+        </a>
+        <form action="/api/logout" method="post">
+          <button type="submit" className="navitem">
+            Sign out
+          </button>
+        </form>
+      </div>
+    </aside>
+  );
+}
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const session = await currentSession();
   return (
@@ -44,42 +130,43 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <a className="skip" href="#content">
           Skip to content
         </a>
-        <header className="site">
-          <a href={session ? "/services" : "/"} className="brand">
-            {mark}
-            chameleon
-          </a>
-          <nav>
-            {session ? (
-              <>
-                <a href="/services">services</a>
-                {session.isAdmin && <a href="/admin">admin</a>}
-                <span className="who">{session.email}</span>
-                <form action="/api/logout" method="post">
-                  <button type="submit" className="link">
-                    sign out
-                  </button>
-                </form>
-              </>
-            ) : (
-              <>
+        {session ? (
+          <div className="shell">
+            <Sidebar session={session} />
+            <div className="workspace">
+              <header className="topbar">
+                <a href="/dashboard" className="brand">
+                  {mark}
+                  chameleon
+                </a>
+                <NavToggle />
+              </header>
+              {children}
+            </div>
+          </div>
+        ) : (
+          <>
+            <header className="site">
+              <a href="/" className="brand">
+                {mark}
+                chameleon
+              </a>
+              <nav>
                 <a href="/#how">how it works</a>
                 <a href="/login">sign in</a>
                 <a href="/signup" className="btn">
                   Start free
                 </a>
-              </>
-            )}
-          </nav>
-        </header>
-        {children}
-        {!session && (
-          <footer className="site">
-            <span>Chameleon — rotating capture links for credential simulations.</span>
-            <span>
-              <a href="/login">sign in</a> · <a href="/signup">create an account</a>
-            </span>
-          </footer>
+              </nav>
+            </header>
+            {children}
+            <footer className="site">
+              <span>Chameleon — rotating capture links for credential simulations.</span>
+              <span>
+                <a href="/login">sign in</a> · <a href="/signup">create an account</a>
+              </span>
+            </footer>
+          </>
         )}
       </body>
     </html>

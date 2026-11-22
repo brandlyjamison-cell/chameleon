@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { assertFree, lockWithCaps } from "./services";
-import { orNotFound, type Ctx } from "../ctx";
+import { NotFoundError, orNotFound, type Ctx } from "../ctx";
 
 export interface DomainRow {
   id: string;
@@ -9,6 +9,9 @@ export interface DomainRow {
   hostname: string;
   status: string;
   verify_token: string;
+  last_checked_at: Date | null;
+  last_result: string | null;
+  last_detail: string | null;
 }
 
 export async function add(
@@ -34,8 +37,15 @@ export async function listForService(
   serviceId: string,
 ): Promise<DomainRow[]> {
   const { rows } = await c.query<DomainRow>(
-    `select id, org_id, service_id, hostname, status, verify_token
-     from domains where service_id = $1 and deleted_at is null order by created_at`,
+    `select d.id, d.org_id, d.service_id, d.hostname, d.status, d.verify_token,
+            d.last_checked_at, c.result as last_result, c.detail as last_detail
+       from domains d
+       left join lateral (
+         select result, detail from domain_checks
+          where domain_id = d.id order by created_at desc limit 1
+       ) c on true
+      where d.service_id = $1 and d.deleted_at is null
+      order by d.created_at`,
     [serviceId],
   );
   return rows;
@@ -78,19 +88,24 @@ export interface VerifyRow extends DomainRow {
 
 export const TXT_PREFIX = "cameleon-verify=";
 
-export async function beginVerify(c: pg.PoolClient, id: string): Promise<VerifyRow> {
-  const { rows } = await c.query<VerifyRow>(
-    // Active rows are re-checked daily and keep their status; nothing else can
-    // skip `verifying`, so a mismatch can never silently revive a failed host.
-    `update domains set
-       status = case when status in ('pending', 'verifying') then 'verifying' else status end,
-       last_checked_at = now()
-     where id = $1 and deleted_at is null and status <> 'failed'
-     returning id, org_id, service_id, hostname, status, verify_token,
-               cf_hostname_id, verified_at, last_checked_at`,
-    [id],
-  );
-  return orNotFound(rows[0]);
+export async function beginVerify(
+  c: pg.PoolClient,
+  id: string,
+  orgId: string,
+): Promise<VerifyRow> {
+  // The definer function qualifies the row and restarts the clock on a failed
+  // re-check (0020); active rows stay active through a daily re-check.
+  try {
+    const { rows } = await c.query<VerifyRow>("select * from begin_verify($1, $2)", [
+      id,
+      orgId,
+    ]);
+    return orNotFound(rows[0]);
+  } catch (error) {
+    // A definer exception is a plain pg error, not an HttpError.
+    if ((error as { code?: string }).code === "P0002") throw new NotFoundError();
+    throw error;
+  }
 }
 
 export async function recordCheck(

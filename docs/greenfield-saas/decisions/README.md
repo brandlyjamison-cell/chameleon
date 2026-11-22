@@ -37,5 +37,8 @@ Index:
 | 0025 | Domain verification by DoH, 30-day tombstone          | accepted |
 | 0026 | Billing is per service, payment before activation     | accepted |
 | 0027 | One mail queue; forwarding targets prove themselves   | accepted |
+| 0028 | Console IA and white service surfaces                 | accepted |
+| 0029 | Provider is the payment authority; `finished` credits | accepted |
+| 0030 | DB rate limits and a money-driven lifecycle sweep     | accepted |
 
 Last reviewed: 2026-11-21

@@ -1,17 +1,20 @@
 export default function NotFound() {
   return (
-    <main className="app" id="content">
+    <main className="app narrow" id="content">
       <p className="eyebrow">404</p>
       <h1>Nothing here</h1>
       <p className="muted">
         The page does not exist, or it belongs to another account. The address bar is the
-        truth; try the dashboard.
+        truth.
       </p>
-      <p>
-        <a className="btn" href="/services">
-          Go to services
+      <div className="actions">
+        <a className="btn" href="/dashboard">
+          Overview
         </a>
-      </p>
+        <a className="btn ghost" href="/services">
+          Services
+        </a>
+      </div>
     </main>
   );
 }

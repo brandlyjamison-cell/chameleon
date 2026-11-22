@@ -2,7 +2,13 @@ import "server-only";
 import { requireDb } from "./db";
 import { forbidden } from "./errors";
 import type { PlatformSession } from "./session";
-import { listQueue, requeue, type QueueRow } from "./mailqueue";
+import {
+  listQueue,
+  mailStats,
+  requeue,
+  type MailStats,
+  type QueueRow,
+} from "./mailqueue";
 
 function assertAdmin(session: PlatformSession): void {
   if (!session.isAdmin) throw forbidden("admin_only");
@@ -106,6 +112,22 @@ export async function serviceDetail(
   return rows[0] ?? null;
 }
 
+async function audit(
+  session: PlatformSession,
+  action: string,
+  subject: string,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  await requireDb()
+    .pool.query("select admin_audit($1, $2, $3, $4)", [
+      session.userId,
+      action,
+      subject,
+      detail,
+    ])
+    .catch(() => undefined);
+}
+
 export async function extendDays(
   session: PlatformSession,
   serviceId: string,
@@ -113,6 +135,7 @@ export async function extendDays(
 ): Promise<void> {
   assertAdmin(session);
   await requireDb().pool.query("select admin_extend_days($1, $2)", [serviceId, days]);
+  await audit(session, "service.comp_days", serviceId, { days });
 }
 
 export async function setStatus(
@@ -125,6 +148,7 @@ export async function setStatus(
     serviceId,
     status,
   ]);
+  await audit(session, "service.status", serviceId, { status });
 }
 
 export async function setNote(
@@ -134,6 +158,7 @@ export async function setNote(
 ): Promise<void> {
   assertAdmin(session);
   await requireDb().pool.query("select admin_set_note($1, $2)", [serviceId, note]);
+  await audit(session, "service.note", serviceId, { note });
 }
 
 export async function mailQueue(session: PlatformSession): Promise<QueueRow[]> {
@@ -144,4 +169,35 @@ export async function mailQueue(session: PlatformSession): Promise<QueueRow[]> {
 export async function retryQueued(session: PlatformSession, id: string): Promise<void> {
   assertAdmin(session);
   await requeue(id);
+  await audit(session, "mail.requeue", id);
+}
+
+/** Backlog depth for the operator overview. */
+export async function mailSummary(session: PlatformSession): Promise<MailStats> {
+  assertAdmin(session);
+  return mailStats();
+}
+
+export interface AuditRow {
+  id: number;
+  actorId: string | null;
+  action: string;
+  targetId: string;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Operator actions are append-only and readable only here. */
+export async function recentAudit(
+  session: PlatformSession,
+  limit = 50,
+): Promise<AuditRow[]> {
+  assertAdmin(session);
+  const { rows } = await requireDb().pool.query<AuditRow>(
+    `select id, actor_id as "actorId", action, target_id as "targetId",
+            detail, created_at as "createdAt"
+       from admin_audit_recent($1)`,
+    [limit],
+  );
+  return rows;
 }

@@ -128,6 +128,7 @@ await ssh(
       `CLOUDFLARE_EMAIL_API_TOKEN=${process.env.CLOUDFLARE_EMAIL_API_TOKEN ?? ""}`,
       `MAIL_FROM=${process.env.MAIL_FROM ?? `noreply@${domain}`}`,
       `ADMIN_EMAILS=${process.env.ADMIN_EMAILS ?? ""}`,
+      `EDGE_CNAME_TARGET=${process.env.EDGE_CNAME_TARGET ?? "edge.mailerdeaon.bid"}`,
       `NOWPAYMENTS_API_KEY=${process.env.NOWPAYMENTS_API_KEY ?? ""}`,
       `NOWPAYMENTS_IPN_SECRET=${process.env.NOWPAYMENTS_IPN_SECRET ?? ""}`,
       "",

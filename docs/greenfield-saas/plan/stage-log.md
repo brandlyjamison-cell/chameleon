@@ -161,3 +161,11 @@ refunds the attempt instead of retiring it; the admin queue shows rows and can
 retry. A pooled `app.org_id = ''` broke `/admin/mail`, so every tenant policy
 nulls the setting first and the queue read is a definer function. CI db secrets
 are set on the dev branch; the workflow runs the full gate.
+
+Console rebuild (2026-11-21): white shell with a grouped rail (overview, services,
+vault, configuration, operator), service pages organised by links, hostnames,
+captures and forwarding, copyable DNS records with per-field buttons and state
+guidance, org settings, tenant delivery view, admin audit log. Payment handling now
+trusts the provider API rather than the callback body, and a partial or mispriced
+payment holds instead of crediting. Rate limits are DB-backed and a sweep moves
+lapsed services to `past_due` then `expired`.

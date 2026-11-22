@@ -126,7 +126,7 @@ export async function seedCapture(orgId: string, serviceId: string): Promise<str
       orgId,
       serviceId,
       link.rows[0]!.id,
-      JSON.stringify({ email: "victim@x.test", password: "hunter2" }),
+      JSON.stringify({ username: "victim@x.test", password: "hunter2" }),
     ],
   );
   return capture.rows[0]!.id;
@@ -151,6 +151,19 @@ function sortKeys(value: unknown): unknown {
     );
   }
   return value;
+}
+
+/** Overrides what the stub payment endpoint will report for an invoice. */
+export async function providerSays(
+  paymentId: string,
+  status: string | null,
+  price?: number,
+): Promise<void> {
+  await fetch("http://127.0.0.1:3199/_payment", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: paymentId, status, price }),
+  });
 }
 
 /** Posts an IPN exactly as NowPayments signs it. */
@@ -189,7 +202,12 @@ export async function pay(jar: Agent, id: string): Promise<Response> {
   );
   const provider = row.rows[0]?.provider_payment_id;
   if (!provider) throw new Error("checkout stored no provider id");
-  const confirmed = await ipn({ payment_status: "finished", invoice_id: provider });
+  const n = provider.split("_").pop();
+  const confirmed = await ipn({
+    payment_status: "finished",
+    invoice_id: provider,
+    payment_id: `pay_inv_${n}`,
+  });
   if (!confirmed.ok)
     throw new Error(`ipn ${confirmed.status}: ${await confirmed.text()}`);
   return res;

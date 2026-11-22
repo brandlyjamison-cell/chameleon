@@ -16,6 +16,7 @@ const txt = new Map<string, string[]>();
 let cfMode: "entitlement" | "pending" | "active" = "entitlement";
 let upstream: Server | undefined;
 export const invoices: Record<string, unknown>[] = [];
+const paymentState = new Map<string, { status: string | null; price?: number }>();
 let child: ChildProcess | undefined;
 
 function startUpstream(): Promise<void> {
@@ -45,6 +46,35 @@ function startUpstream(): Promise<void> {
     }
     if (url.pathname === "/_invoices") {
       return send(200, invoices);
+    }
+    if (url.pathname === "/_payment" && req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => (raw += chunk));
+      return req.on("end", () => {
+        const body = JSON.parse(raw) as {
+          id: string;
+          status: string | null;
+          price?: number;
+        };
+        paymentState.set(
+          body.id,
+          body.price === undefined
+            ? { status: body.status }
+            : { status: body.status, price: body.price },
+        );
+        send(200, { ok: true });
+      });
+    }
+    if (url.pathname.startsWith("/v1/payment/")) {
+      const id = url.pathname.split("/").pop() ?? "";
+      const state = paymentState.get(id);
+      if (state?.status === null) return send(500, { message: "down" });
+      const index = Number(id.split("_").pop()) - 1;
+      const invoice = invoices[index] as { price_amount?: number } | undefined;
+      return send(200, {
+        payment_status: state?.status ?? "finished",
+        price_amount: state?.price ?? invoice?.price_amount ?? 0,
+      });
     }
     if (url.pathname === "/v1/invoice" && req.method === "POST") {
       let raw = "";

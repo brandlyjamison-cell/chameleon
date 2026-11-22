@@ -96,7 +96,7 @@ export async function currentSession(
  * keep throwing 401 so an API caller can see the status.
  */
 export async function requirePageSession(): Promise<
-  Ctx & { emailVerified: boolean; email: string }
+  Ctx & { emailVerified: boolean; email: string; isAdmin: boolean }
 > {
   const session = await currentSession();
   if (!session) redirect("/login");
@@ -107,6 +107,7 @@ export async function requirePageSession(): Promise<
     role: session.role,
     emailVerified: session.emailVerified,
     email: session.email,
+    isAdmin: session.isAdmin,
   };
 }
 
@@ -129,7 +130,7 @@ export async function requireSession(
 export async function requireAdminPage(): Promise<PlatformSession> {
   const session = await currentSession();
   if (!session) redirect("/login");
-  if (!session.isAdmin) redirect("/services");
+  if (!session.isAdmin) redirect("/dashboard");
   return session;
 }
 

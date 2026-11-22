@@ -12,6 +12,6 @@ export async function POST(
     await removeAddress(ctx, id);
     return seeOther("/services?forward_removed=1");
   } catch (error) {
-    return backWithError("/services", error);
+    return backWithError("/settings/forwarding", error);
   }
 }
