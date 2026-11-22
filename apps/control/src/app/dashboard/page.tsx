@@ -42,6 +42,13 @@ export default async function Dashboard() {
         }
       />
 
+      {!session.emailVerified ? (
+        <p className="note warn">
+          Confirm <strong>{session.email}</strong> before activating a service.{" "}
+          <a href="/welcome">Resend the link</a>.
+        </p>
+      ) : null}
+
       {services.length === 0 ? (
         <Empty
           title="No services yet"
@@ -56,13 +63,6 @@ export default async function Dashboard() {
         </Empty>
       ) : (
         <div className="stack">
-          {!session.emailVerified ? (
-            <p className="note warn">
-              Confirm <strong>{session.email}</strong> before activating a service.{" "}
-              <a href="/welcome">Resend the link</a>.
-            </p>
-          ) : null}
-
           {unpaid.length > 0 ? (
             <p className="note warn">
               {unpaid.length === 1 ? "One service has" : `${unpaid.length} services have`}{" "}
