@@ -1,0 +1,33 @@
+name: uptime
+
+# The 2026-11-22 outage ran 17 hours undetected because every existing alarm
+# lived on the box that died (INC-01). This probe runs on GitHub, so the host
+# going dark takes the alarm with it either.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: control host is up and healthy
+        run: |
+          set -euxo pipefail
+          body=$(curl -fsS --max-time 25 https://app.mailerdeaon.bid/api/health)
+          echo "$body"
+          echo "$body" | grep -q '"ok":true'
+      - name: the data host reaches the same origin
+        run: |
+          set -euo pipefail
+          # go. may legitimately answer 444 (Caddy catch-all) until the edge
+          # worker lands; 522/000 is the outage case.
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' https://go.mailerdeaon.bid/ || true)
+          echo "status $code"
+          test "$code" != "000" -a "$code" != "522" -a "$code" != "521"

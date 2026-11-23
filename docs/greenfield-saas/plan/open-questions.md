@@ -344,3 +344,19 @@ capture. A scraper could burn the capture cap of every service it can guess. The
 key is 12 hex characters, so guessing is not cheap, but a rate limit per key
 (bucket 60/min) belongs in the edge once it serves the path. Lean: reuse the
 `limit` table keyed by preview key plus IP. Owner: me, with the edge (stage 5).
+
+### OPEN-OPS-06 — a tool output with NUL bytes bricks the agent session
+
+Dumping a PNG (`cat shot.png`) or a padded dev-server log into the transcript
+stores raw `\x00` in the message. The provider then rejects **every** later
+request with `400 Invalid request parameters / String must not contain null
+bytes`, so the session dies at the next compaction and nothing can be asked in
+it again.
+
+Repair without losing history: strip `\x00` from the stored message JSON in
+`~/.local/share/opencode/opencode.db` (`session_message.data`, matching
+`session_id`) and reload. Done for the flow-arch session on 2026-11-23; that
+session resumes now.
+
+Habit until the harness sanitises tool output: after `cat` of a binary or a log
+with padding, prefer `strings`, `head -c`, or `xxd | head`.
