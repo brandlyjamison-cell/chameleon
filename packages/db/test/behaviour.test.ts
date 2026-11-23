@@ -115,10 +115,10 @@ describe.skipIf(!hasDb)("repos are tenant-scoped (INV-DATA-03/07)", () => {
     await reset();
     const s = await seed();
     await expect(
-      withTenant(db, ctxOf(s), (c) => links.get(c, ctxOf(s), s.domainId)),
+      withTenant(db, ctxOf(s), (c) => links.get(c, ctxOf(s), s.hostnameId)),
     ).rejects.toThrow(NotFoundError);
     await expect(
-      withTenant(db, ctxOf(s), (c) => domains.get(c, ctxOf(s), s.linkId)),
+      withTenant(db, ctxOf(s), (c) => domains.getHostname(c, ctxOf(s), s.linkId)),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -137,43 +137,50 @@ describe.skipIf(!hasDb)("minting (INV-DATA-05)", () => {
     await admin.query("update tiers set link_cap = 1 where id = 1");
     await admin.query("delete from links where service_id = $1", [s.serviceId]);
     await withTenant(db, ctxOf(s), (c) =>
-      links.mint(c, ctxOf(s), { serviceId: s.serviceId, domainId: s.domainId }),
+      links.mint(c, ctxOf(s), { serviceId: s.serviceId, hostnameId: s.hostnameId }),
     );
     await expect(
       withTenant(db, ctxOf(s), (c) =>
-        links.mint(c, ctxOf(s), { serviceId: s.serviceId, domainId: s.domainId }),
+        links.mint(c, ctxOf(s), { serviceId: s.serviceId, hostnameId: s.hostnameId }),
       ),
     ).rejects.toThrow(CapError);
     const { rows } = await admin.query("select count(*)::int as n from links");
     expect(rows[0].n).toBe(1);
   });
 
-  it("refuses a domain from another service", async () => {
+  it("refuses a hostname from another service", async () => {
     await reset();
     const s = await seed();
     const other = await admin.query(
-      `insert into domains (org_id, service_id, hostname, verify_token, status, verified_at, verified_by)
-       values ($1, $2, 'other.example.test', 't', 'active', now(), 'txt') returning id`,
-      [s.otherOrgId, s.otherServiceId],
+      `insert into org_domains (org_id, root, status, verified_at, verified_by)
+       values ($1, 'other.example.test', 'active', now(), 'txt') returning id`,
+      [s.otherOrgId],
+    );
+    const host = await admin.query(
+      `insert into hostnames (org_id, domain_id, service_id, fqdn, label, verify_token, status, verified_at)
+       values ($1, $2, $3, 'x.other.example.test', 'x', 't', 'active', now()) returning id`,
+      [s.otherOrgId, other.rows[0].id, s.otherServiceId],
     );
     await expect(
       withTenant(db, ctxOf(s), (c) =>
-        links.mint(c, ctxOf(s), { serviceId: s.serviceId, domainId: other.rows[0].id }),
+        links.mint(c, ctxOf(s), { serviceId: s.serviceId, hostnameId: host.rows[0].id }),
       ),
     ).rejects.toThrow(/does not belong/);
   });
 });
 
-describe.skipIf(!hasDb)("domains (INV-SEC-06/07)", () => {
+describe.skipIf(!hasDb)("org domains and hostnames (INV-SEC-06/07)", () => {
   it("cannot be activated without verification", async () => {
     await reset();
     const s = await seed();
     const d = await admin.query(
-      `insert into domains (org_id, service_id, hostname, verify_token) values ($1, $2, 'x.example.test', 't') returning id`,
-      [s.orgId, s.serviceId],
+      `insert into org_domains (org_id, root) values ($1, 'x.example.test') returning id`,
+      [s.orgId],
     );
     await expect(
-      admin.query("update domains set status = 'active' where id = $1", [d.rows[0].id]),
+      admin.query("update org_domains set status = 'active' where id = $1", [
+        d.rows[0].id,
+      ]),
     ).rejects.toThrow(/verified_at/);
   });
 
@@ -181,41 +188,55 @@ describe.skipIf(!hasDb)("domains (INV-SEC-06/07)", () => {
     await reset();
     const s = await seed();
     await admin.query(
-      `insert into domains (org_id, service_id, hostname, verify_token, status, verified_at, verified_by, deleted_at, tombstoned_at)
-       values ($1, $2, 'dead.example.test', 't', 'failed', now(), 'txt', now(), now())`,
-      [s.orgId, s.serviceId],
+      `insert into org_domains (org_id, root, status, verified_at, verified_by, deleted_at, tombstoned_at)
+       values ($1, 'dead.example.test', 'failed', now(), 'txt', now(), now())`,
+      [s.orgId],
     );
     await expect(
       admin.query(
-        `insert into domains (org_id, service_id, hostname, verify_token) values ($1, $2, 'DEAD.example.test', 't')`,
-        [s.orgId, s.serviceId],
+        `insert into org_domains (org_id, root) values ($1, 'DEAD.example.test')`,
+        [s.orgId],
       ),
     ).resolves.toBeTruthy();
     await expect(
       admin.query(
-        `insert into domains (org_id, service_id, hostname, verify_token) values ($1, $2, 'dead.example.test', 't')`,
-        [s.otherOrgId, s.otherServiceId],
+        `insert into org_domains (org_id, root) values ($1, 'dead.example.test')`,
+        [s.otherOrgId],
       ),
     ).rejects.toThrow(/tombstoned/);
   });
 
-  it("enforces the domain slot cap", async () => {
+  it("enforces the hostname slot cap per service", async () => {
     await reset();
     const s = await seed();
     const ctx = ctxOf(s);
-    await withTenant(db, ctx, (c) =>
-      domains.add(c, ctx, {
-        serviceId: s.serviceId,
-        hostname: "a.example.test",
-        verifyToken: "t",
-      }),
+    const domain = await admin.query<{ id: string }>(
+      `select domain_id as id from hostnames where id = $1`,
+      [s.hostnameId],
     );
+    const domainId = domain.rows[0]!.id;
+    const cap = await admin.query<{ hostname_cap: number }>(
+      `select t.hostname_cap from services s join tiers t on t.id = s.tier_id where s.id = $1`,
+      [s.serviceId],
+    );
+    // The seed already uses one slot, so `cap - 1` more fit.
+    for (let i = 1; i < cap.rows[0]!.hostname_cap; i += 1) {
+      await withTenant(db, ctx, (c) =>
+        domains.addHostname(c, ctx, {
+          serviceId: s.serviceId,
+          domainId,
+          label: `h${i}`,
+          fqdn: `h${i}.example.test`,
+        }),
+      );
+    }
     await expect(
       withTenant(db, ctx, (c) =>
-        domains.add(c, ctx, {
+        domains.addHostname(c, ctx, {
           serviceId: s.serviceId,
-          hostname: "c.example.test",
-          verifyToken: "t",
+          domainId,
+          label: "over",
+          fqdn: "over.example.test",
         }),
       ),
     ).rejects.toThrow(CapError);

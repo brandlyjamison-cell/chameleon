@@ -68,13 +68,13 @@ function Sidebar({
 
         <div className="navgroup">
           <span className="navlabel">Data</span>
-          <NavLink href="/vault">Capture vault</NavLink>
+          <NavLink href="/vault">Vault</NavLink>
         </div>
 
         <div className="navgroup">
-          <span className="navlabel">Configuration</span>
-          <NavLink href="/settings" exact>
-            Organisation
+          <span className="navlabel">Organization</span>
+          <NavLink href="/settings" exact sub>
+            General
           </NavLink>
           <NavLink href="/settings/domains" sub>
             Domains
@@ -82,25 +82,7 @@ function Sidebar({
           <NavLink href="/settings/forwarding" sub>
             Forwarding
           </NavLink>
-          <NavLink href="/settings/delivery" sub>
-            Mail delivery
-          </NavLink>
         </div>
-
-        {session.isAdmin ? (
-          <div className="navgroup">
-            <span className="navlabel">Platform</span>
-            <NavLink href="/admin" exact>
-              Operator panel
-            </NavLink>
-            <NavLink href="/admin/mail" sub>
-              Mail queue
-            </NavLink>
-            <NavLink href="/admin/audit" sub>
-              Audit log
-            </NavLink>
-          </div>
-        ) : null}
       </nav>
 
       <span className="spacer" />

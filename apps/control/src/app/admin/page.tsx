@@ -1,56 +1,32 @@
-import { redirect } from "next/navigation";
+import { overview, recentAudit, searchTenants } from "../../server/admin";
 import { requireAdminPage } from "../../server/session";
-import {
-  listAllServices,
-  listOrgs,
-  mailSummary,
-  overview,
-  recentAudit,
-  setStatus,
-} from "../../server/admin";
-import { PageHeader, StatusPill, shortDate, shortTime } from "../../components/ui";
+import { PageHeader, shortDate, shortTime } from "../../components/ui";
 
-export default async function Admin() {
+export default async function Admin({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const session = await requireAdminPage();
-  const [counts, orgs, services, mail, audit] = await Promise.all([
+  const { q = "" } = await searchParams;
+  const [counts, tenants, audit] = await Promise.all([
     overview(session),
-    listOrgs(session),
-    listAllServices(session),
-    mailSummary(session),
+    searchTenants(session, q),
     recentAudit(session, 8),
   ]);
-
-  async function toggle(formData: FormData) {
-    "use server";
-    const ctx = await requireAdminPage();
-    const id = String(formData.get("id") ?? "");
-    const next = formData.get("next") === "suspend" ? "suspended" : "active";
-    await setStatus(ctx, id, next);
-    redirect("/admin");
-  }
 
   return (
     <main className="app wide" id="content">
       <PageHeader
         eyebrow="Platform"
-        title="Operator panel"
-        lede="Cross-tenant by definition. Captures stay unreadable here: the operator sees counts and money, not plaintext."
-        actions={
-          <>
-            <a className="btn ghost" href="/admin/mail">
-              Mail queue
-            </a>
-            <a className="btn ghost" href="/admin/audit">
-              Audit log
-            </a>
-          </>
-        }
+        title="Tenants"
+        lede="Cross-tenant by definition. Find the tenant first, then open its services, domains and forwarding from one place."
       />
 
       <div className="tiles">
         <div className="tile">
           <strong>{counts.orgs}</strong>
-          <span className="muted">orgs</span>
+          <span className="muted">tenants</span>
         </div>
         <div className="tile">
           <strong>{counts.services}</strong>
@@ -70,117 +46,61 @@ export default async function Admin() {
         </div>
       </div>
 
-      <section className="section">
-        <div className="split">
-          <div className="card">
-            <div className="row">
-              <h2>Mail</h2>
-              <a className="btn ghost sm" href="/admin/mail">
-                Open queue
-              </a>
-            </div>
-            <div className="tiles">
-              <div className="tile">
-                <strong>{mail.queued}</strong>
-                <span className="muted">queued</span>
-              </div>
-              <div className="tile">
-                <strong>{mail.sending}</strong>
-                <span className="muted">sending</span>
-              </div>
-              <div className="tile">
-                <strong>{mail.failed24h}</strong>
-                <span className="muted">failed 24h</span>
-              </div>
-              <div className="tile">
-                <strong>{Math.round(mail.oldestQueuedSeconds / 60)}</strong>
-                <span className="muted">oldest, minutes</span>
-              </div>
-            </div>
-            {mail.oldestQueuedSeconds > 300 ? (
-              <p className="error" role="alert" style={{ marginTop: "0.8rem" }}>
-                Backlog is older than five minutes. The drain itself may be stuck, not
-                just the provider.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="card">
-            <div className="row">
-              <h2>Recent operator actions</h2>
-              <a className="btn ghost sm" href="/admin/audit">
-                All
-              </a>
-            </div>
-            {audit.length === 0 ? (
-              <p className="muted">Nothing recorded yet.</p>
-            ) : (
-              <div className="stack">
-                {audit.map((row) => (
-                  <div key={row.id}>
-                    <strong className="mono">{row.action}</strong>
-                    <div className="fine">
-                      {row.targetId.slice(0, 18)} · {shortTime(row.createdAt)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <form action="/admin" className="inline-form" style={{ margin: "1rem 0" }}>
+        <div className="field grow">
+          <label htmlFor="q">Search tenants</label>
+          <input
+            id="q"
+            name="q"
+            defaultValue={q}
+            placeholder="Name, owner email or exact tenant id"
+            autoComplete="off"
+          />
         </div>
-      </section>
+        <button type="submit" className="btn">
+          Search
+        </button>
+      </form>
 
-      <section className="section">
-        <h2>Services</h2>
-        <div className="table">
-          {services.map((service) => (
-            <div className="tr" key={service.serviceId}>
-              <a href={`/admin/${service.serviceId}`}>
-                <strong>{service.orgName}</strong>
-                <div className="fine">{service.ownerEmail ?? "no owner"}</div>
-              </a>
-              <StatusPill status={service.status} />
-              <span className="muted">{service.tier}</span>
-              <span className="muted">
-                {service.paidUntil ? `paid to ${shortDate(service.paidUntil)}` : "unpaid"}
-              </span>
-              <span className="muted">{service.captures} captures</span>
-              <form action={toggle}>
-                <input type="hidden" name="id" value={service.serviceId} />
-                <input
-                  type="hidden"
-                  name="next"
-                  value={service.status === "suspended" ? "restore" : "suspend"}
-                />
-                <button type="submit" className="btn ghost sm">
-                  {service.status === "suspended" ? "Restore" : "Suspend"}
-                </button>
-              </form>
+      <div className="table orgs">
+        {tenants.map((tenant) => (
+          <a className="tr" key={tenant.orgId} href={`/admin/tenants/${tenant.orgId}`}>
+            <div>
+              <strong>{tenant.orgName}</strong>
+              <div className="fine" title={tenant.ownerEmail ?? undefined}>
+                {tenant.ownerEmail ?? "no owner"}
+              </div>
             </div>
-          ))}
-          {services.length === 0 && <p className="muted">No services yet.</p>}
-        </div>
-      </section>
+            <span className="muted">{tenant.services} services</span>
+            <span className="muted">
+              {tenant.domains} domains · {tenant.hostnames} hostnames
+            </span>
+            <span className="muted">{tenant.captures} captures</span>
+            <span className="muted">last seen {shortTime(tenant.lastSeen)}</span>
+            <span className="muted">joined {shortDate(tenant.createdAt)}</span>
+          </a>
+        ))}
+        {tenants.length === 0 ? (
+          <p className="muted">{q ? "No tenant matches that." : "No tenants yet."}</p>
+        ) : null}
+      </div>
 
       <section className="section">
-        <h2>Orgs</h2>
-        <div className="table orgs">
-          {orgs.map((org) => (
-            <div className="tr" key={org.orgId}>
-              <div>
-                <strong>{org.orgName}</strong>
-                <div className="fine" title={org.ownerEmail ?? undefined}>
-                  {org.ownerEmail ?? "no owner"}
+        <h2>Recent operator actions</h2>
+        {audit.length === 0 ? (
+          <p className="muted">Nothing recorded yet.</p>
+        ) : (
+          <div className="stack">
+            {audit.map((row) => (
+              <div key={row.id}>
+                <strong className="mono">{row.action}</strong>
+                <div className="fine">
+                  {row.targetId.slice(0, 18)} · {shortTime(row.createdAt)}
                 </div>
               </div>
-              <span className="muted">{org.services} services</span>
-              <span className="muted">{org.captures} captures</span>
-              <span className="muted">${(org.paid / 100).toFixed(2)} paid</span>
-              <span className="muted">{shortDate(org.createdAt)}</span>
-            </div>
-          ))}
-          {orgs.length === 0 && <p className="muted">No orgs yet.</p>}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

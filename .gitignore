@@ -16,3 +16,6 @@ Thumbs.db
 # test mail sink
 
 apps/control/test/.tmp/
+
+# rehearsal scaffolding
+.rehearsal-*

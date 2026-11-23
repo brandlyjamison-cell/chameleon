@@ -18,7 +18,7 @@ export interface OrgProfile {
 
 export const OrgSettingsSchema = z.object({
   name: z.string().trim().min(2).max(80),
-  notifyOnCapture: z.boolean().default(true),
+  notifyOnCapture: z.boolean().default(false),
   maskPasswords: z.boolean().default(false),
 });
 
@@ -36,7 +36,7 @@ export async function getOrg(ctx: Ctx): Promise<OrgProfile> {
       slug: row.slug,
       createdAt: row.created_at.toISOString(),
       settings: {
-        notifyOnCapture: row.settings?.notifyOnCapture !== false,
+        notifyOnCapture: row.settings?.notifyOnCapture === true,
         maskPasswords: row.settings?.maskPasswords === true,
       },
     };

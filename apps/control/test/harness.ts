@@ -8,6 +8,7 @@ export const BASE = process.env.SERVER_URL ?? "http://localhost:3100";
 export interface Agent {
   cookies: string[];
   post(path: string, form?: Record<string, string>): Promise<Response>;
+  postJson(path: string, body: unknown): Promise<Response>;
   get(path: string): Promise<Response>;
 }
 
@@ -32,6 +33,14 @@ export function agent(): Agent {
         self.cookies.push(pair);
       }
       return res;
+    },
+    async postJson(path, body) {
+      return fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { cookie: self.cookies.join("; "), "content-type": "application/json" },
+        body: JSON.stringify(body),
+        redirect: "manual",
+      });
     },
     async get(path) {
       return fetch(`${BASE}${path}`, {
@@ -107,17 +116,20 @@ export async function verify(jar: Agent, email: string): Promise<Response> {
 
 /** A domain, a link and one capture, seeded under the bypassing role. */
 export async function seedCapture(orgId: string, serviceId: string): Promise<string> {
+  const root = `seed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.test`;
   const domain = await admin.query<{ id: string }>(
-    "insert into domains (org_id, service_id, hostname, verify_token) values ($1, $2, $3, 't') returning id",
-    [
-      orgId,
-      serviceId,
-      `seed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.test`,
-    ],
+    `insert into org_domains (org_id, root, status, verified_at, verified_by)
+     values ($1, $2, 'active', now(), 'txt') returning id`,
+    [orgId, root],
+  );
+  const host = await admin.query<{ id: string }>(
+    `insert into hostnames (org_id, domain_id, service_id, fqdn, label, verify_token, status, verified_at)
+     values ($1, $2, $3, $4, 'login', 't', 'active', now()) returning id`,
+    [orgId, domain.rows[0]!.id, serviceId, `login.${root}`],
   );
   const link = await admin.query<{ id: string }>(
-    "insert into links (org_id, service_id, domain_id, slug) values ($1, $2, $3, $4) returning id",
-    [orgId, serviceId, domain.rows[0]!.id, "ABCDE"],
+    "insert into links (org_id, service_id, hostname_id, slug) values ($1, $2, $3, $4) returning id",
+    [orgId, serviceId, host.rows[0]!.id, "ABCDE"],
   );
   const capture = await admin.query<{ id: string }>(
     `insert into captures (id, org_id, service_id, link_id, kind, fields, source, received_at)
@@ -133,7 +145,8 @@ export async function seedCapture(orgId: string, serviceId: string): Promise<str
 }
 
 export async function createService(jar: Agent, tier = "starter"): Promise<string> {
-  const res = await jar.post("/api/services", { serviceType: "chameleon", tier });
+  const name = `Svc ${Math.random().toString(36).slice(2, 8)}`;
+  const res = await jar.post("/api/services", { serviceType: "chameleon", tier, name });
   const location = res.headers.get("location") ?? "";
   const id = location.split("/").pop() ?? "";
   if (!id)

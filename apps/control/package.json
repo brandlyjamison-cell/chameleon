@@ -23,6 +23,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
+    "tldts": "^7.5.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

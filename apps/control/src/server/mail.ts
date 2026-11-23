@@ -16,6 +16,50 @@ export interface Mail {
 
 export type SendOutcome = "sent" | "throttled" | "failed";
 
+export interface MailLimits {
+  quota: number;
+  sent: number;
+  overQuota: boolean;
+  /** When the daily window resets, or null when the provider did not say. */
+  resetsAt: Date | null;
+}
+
+/**
+ * The provider publishes its own quota. Checking it first is what turns a burst
+ * of 429s into one parked batch: with 200/day, QA alone can spend the window.
+ * A failed probe is unknown, not exhausted.
+ */
+export async function mailLimits(): Promise<MailLimits | null> {
+  const token = process.env.CLOUDFLARE_EMAIL_API_TOKEN;
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!token || !account) return null;
+  try {
+    const res = await fetch(`${endpoint}/${account}/email/sending/limits`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      result?: {
+        quota?: { value?: number };
+        usage?: { sent?: number; over_quota?: boolean; resets_at?: string };
+      };
+    };
+    const quota = Number(body.result?.quota?.value ?? 0);
+    const sent = Number(body.result?.usage?.sent ?? 0);
+    const overQuota = Boolean(body.result?.usage?.over_quota);
+    const resets = body.result?.usage?.resets_at;
+    return {
+      quota,
+      sent,
+      overQuota,
+      resetsAt: resets && !Number.isNaN(Date.parse(resets)) ? new Date(resets) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function sendMail(mail: Mail): Promise<SendOutcome> {
   const token = process.env.CLOUDFLARE_EMAIL_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;

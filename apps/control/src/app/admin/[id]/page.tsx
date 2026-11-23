@@ -47,8 +47,12 @@ export default async function AdminService({
     <main className="app" id="content">
       <PageHeader
         eyebrow="Platform"
-        crumbs={[{ href: "/admin", label: "Operator panel" }, { label: service.orgName }]}
-        title={service.orgName}
+        crumbs={[
+          { href: "/admin", label: "Tenants" },
+          { href: `/admin/tenants/${service.orgId}`, label: service.orgName },
+          { label: "Service" },
+        ]}
+        title={`${service.tier} service`}
         lede={`Service ${service.serviceId}`}
         actions={
           <>

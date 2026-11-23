@@ -14,7 +14,7 @@ export default async function Settings() {
     try {
       await updateOrg(ctx, {
         name: String(formData.get("name") ?? ""),
-        notifyOnCapture: formData.get("notifyOnCapture") === "on",
+        notifyOnCapture: org.settings.notifyOnCapture,
         maskPasswords: formData.get("maskPasswords") === "on",
       });
     } catch {
@@ -63,21 +63,6 @@ export default async function Settings() {
           <label className="check">
             <input
               type="checkbox"
-              name="notifyOnCapture"
-              defaultChecked={org.settings.notifyOnCapture}
-            />
-            <span>
-              <strong>Allow capture mail</strong>
-              <span className="fine">
-                {" "}
-                Eligible captures can be mailed to verified addresses, and the edge ingest
-                reads this later. Off keeps the vault quiet.
-              </span>
-            </span>
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
               name="maskPasswords"
               defaultChecked={org.settings.maskPasswords}
             />
@@ -94,12 +79,10 @@ export default async function Settings() {
         <button type="submit" className="btn" disabled={session.role !== "owner"}>
           Save changes
         </button>
-        {org.settings.notifyOnCapture ? null : (
-          <p className="fine" style={{ marginTop: "0.7rem" }}>
-            Capture mail is currently off. Forwarding addresses can still be mailed by
-            hand from the vault.
-          </p>
-        )}
+        <p className="fine" style={{ marginTop: "0.7rem" }}>
+          The capture-notification destination and its switch live under Configuration,
+          Forwarding.
+        </p>
       </form>
 
       <div className="card">

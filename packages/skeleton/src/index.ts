@@ -25,6 +25,8 @@ export interface RenderTemplate {
   readonly stepCount: 1 | 2;
   readonly step: 1 | 2;
   readonly token: string;
+  /** Overrides the capture endpoint; preview links post to their own path. */
+  readonly action?: string | undefined;
   readonly kind: CaptureKind;
 }
 
@@ -72,14 +74,17 @@ ${t.logoRef === null ? "" : `<link rel="icon" href="${escape(t.logoRef)}">`}
 :root{--bg:${t.palette.bg};--surface:${t.palette.surface};--fg:${t.palette.fg};--accent:${t.palette.accent};--radius:${t.palette.radius}}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);font-family:${t.palette.font};color:var(--fg)}
 main{width:100%;max-width:360px;padding:32px;background:var(--surface);border-radius:var(--radius)}
+img.logo{display:block;max-height:40px;max-width:160px;margin:0 0 18px}
+${t.backdropRef === null ? "" : `body::before{content:"";position:fixed;inset:-8%;background:url("${escape(t.backdropRef)}") center/cover no-repeat;filter:blur(8px) saturate(.9);opacity:.55;z-index:-1}`}
 button{width:100%;padding:12px;border:0;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:16px}
 label,input{display:block;width:100%}input{margin:6px 0 16px;padding:10px;border:1px solid #ccc;border-radius:var(--radius)}
 </style>
 </head>
 <body>
 <main>
+${t.logoRef === null ? "" : `<img class="logo" src="${escape(t.logoRef)}" alt="">`}
 <h1>${escape(heading)}</h1>
-<form method="post" action="/c/${escape(t.token)}">
+<form method="post" action="${escape(t.action ?? `/c/${t.token}`)}">
 ${fields}
 ${nextStep}
 <button type="submit">${escape(t.submitLabel)}</button>

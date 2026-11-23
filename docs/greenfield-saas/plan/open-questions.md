@@ -320,3 +320,43 @@ provider needs an operator key (`MAIL_FALLBACK_*`) and a selection rule: use it
 after the first throttle on the same domain, never in parallel with Cloudflare for
 the same row, or every tenant pays twice. Until then the queue is correct but a
 throttled domain can wait a quarter of an hour per attempt.
+
+## OPEN-ASSET-01 — cloned asset bytes live in Neon `bytea` (blocks scale, not launch)
+
+`profile_assets` holds logos and screenshots in Postgres because R2 needed new
+credentials and the pass was already wide. A full-page screenshot is 80–300 KB;
+screenshots stay bounded by one clone per 30 days per service, but a thousand
+services is 100 MB+ in a database whose storage is billed and restored as one
+unit. Lean: move bytes to R2 behind the same immutable `/a/<id>` URL, keep only the
+key, and let `profile_assets` rows become pointers. Owner: me, before stage 10.
+
+## OPEN-CLONE-01 — how many clones may one service keep? (blocks tidiness, not launch)
+
+Today every clone is kept, newest first, and only the newest generated or accepted
+one renders. A tenant who retries a flaky URL five times leaves five screenshots.
+Lean: keep the newest accepted plus the newest generated, delete older generated
+rows with their assets on the next clone. Owner: PM.
+
+## OPEN-PREVIEW-01 — preview throttling (blocks abuse, not launch)
+
+`/p/*` is anonymous and unmetered; each hit renders the page and a submit writes a
+capture. A scraper could burn the capture cap of every service it can guess. The
+key is 12 hex characters, so guessing is not cheap, but a rate limit per key
+(bucket 60/min) belongs in the edge once it serves the path. Lean: reuse the
+`limit` table keyed by preview key plus IP. Owner: me, with the edge (stage 5).
+
+### OPEN-OPS-06 — a tool output with NUL bytes bricks the agent session
+
+Dumping a PNG (`cat shot.png`) or a padded dev-server log into the transcript
+stores raw `\x00` in the message. The provider then rejects **every** later
+request with `400 Invalid request parameters / String must not contain null
+bytes`, so the session dies at the next compaction and nothing can be asked in
+it again.
+
+Repair without losing history: strip `\x00` from the stored message JSON in
+`~/.local/share/opencode/opencode.db` (`session_message.data`, matching
+`session_id`) and reload. Done for the flow-arch session on 2026-11-23; that
+session resumes now.
+
+Habit until the harness sanitises tool output: after `cat` of a binary or a log
+with padding, prefer `strings`, `head -c`, or `xxd | head`.

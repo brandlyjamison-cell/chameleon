@@ -15,7 +15,7 @@ export interface LinkRow {
   id: string;
   org_id: string;
   service_id: string;
-  domain_id: string;
+  hostname_id: string;
   slug: string;
   pinned_brand_id: string | null;
   status: string;
@@ -28,7 +28,7 @@ export interface LinkRow {
 export async function mint(
   c: pg.PoolClient,
   _ctx: Ctx,
-  input: { serviceId: string; domainId: string; pin?: string | null },
+  input: { serviceId: string; hostnameId: string; pin?: string | null },
 ): Promise<LinkRow> {
   const caps = await lockWithCaps(c, input.serviceId);
   assertFree("link", caps.link_slots_used, caps.link_cap);
@@ -36,10 +36,10 @@ export async function mint(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const { rows } = await c.query<LinkRow>(
-        `insert into links (org_id, service_id, domain_id, slug, pinned_brand_id)
+        `insert into links (org_id, service_id, hostname_id, slug, pinned_brand_id)
          values ((select org_id from services where id = $1), $1, $2, $3, $4)
-         returning id, org_id, service_id, domain_id, slug, pinned_brand_id, status`,
-        [input.serviceId, input.domainId, slug(), input.pin ?? null],
+         returning id, org_id, service_id, hostname_id, slug, pinned_brand_id, status`,
+        [input.serviceId, input.hostnameId, slug(), input.pin ?? null],
       );
       return orNotFound(rows[0]);
     } catch (error) {
@@ -56,7 +56,7 @@ export async function listForService(
   serviceId: string,
 ): Promise<LinkRow[]> {
   const { rows } = await c.query<LinkRow>(
-    `select id, org_id, service_id, domain_id, slug, pinned_brand_id, status
+    `select id, org_id, service_id, hostname_id, slug, pinned_brand_id, status
      from links where service_id = $1 and deleted_at is null order by created_at desc`,
     [serviceId],
   );
@@ -65,7 +65,7 @@ export async function listForService(
 
 export async function get(c: pg.PoolClient, _ctx: Ctx, id: string): Promise<LinkRow> {
   const { rows } = await c.query<LinkRow>(
-    `select id, org_id, service_id, domain_id, slug, pinned_brand_id, status
+    `select id, org_id, service_id, hostname_id, slug, pinned_brand_id, status
      from links where id = $1`,
     [id],
   );

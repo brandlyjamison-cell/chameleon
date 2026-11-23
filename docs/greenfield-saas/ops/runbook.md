@@ -112,6 +112,11 @@ pnpm deploy:<unit>:staging    # then smoke
 pnpm deploy:<unit>:production # after staging smoke is green
 ```
 
+The CI gate and a local `pnpm run ci` hit the **same dev branch**. Two suites
+at once truncate each other and produce a wall of false failures (mail never
+arrives, org rows vanish under an FK, checkout 405s). Never run a local gate
+while a CI run is in flight, and re-run before believing a red result.
+
 Migrations ship before code and are backward-compatible for one release
 (expand/contract). A migration that cannot be backward-compatible needs a
 maintenance window announced in `#incident` at least 1 h ahead.

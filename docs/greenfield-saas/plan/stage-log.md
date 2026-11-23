@@ -178,3 +178,33 @@ addresses with ellipsis instead of colliding. QA found the unconfirmed-email
 banner gated behind having a service and the welcome header labelling the address
 as a DNS state; both fixed and re-proven. The suite now retries a test once —
 it truncates under a live server and a lock deadlock should not block a merge.
+
+## flow-arch — domains, previews, cloning, tenant-first admin (2026-11-22)
+
+Executed against the CTO's DIRECTIVE 02. Branch `flow-arch`.
+
+- Domains are org-owned roots verified once; hostnames are labels services consume
+  (ADR 0032, superseding the per-host model). Migration 0025 renames `domains` to
+  `hostnames`, derives roots with a heuristic + `review_needed`, and re-keys links.
+- Cloudflare for SaaS still returns `1404` on the Free zone. A proof parks at
+  `routing_waiting`; the reconcile promotes on the first pass after an upgrade, so
+  the Pro flip needs no code.
+- The resurrected-trigger bug from stage 4 reappeared as forced RLS hiding
+  cross-tenant rows from definer functions running with no `app.org_id`. Lookups
+  and sweeps are now owned by `app_admin` (BYPASSRLS); `due_domain_checks` returned
+  zero rows until then, which is exactly how it was found.
+- Every service gets a free preview link on `/p/<preview_key>/<slug>`; it spends no
+  link slot and needs no DNS (ADR 0033). Anonymous reads go through definers and
+  every deny is the constant 404.
+- Cloning is real: Browser Rendering fetches HTML and a screenshot, a parser
+  derives title, labels, logo, palette, action and step count, and the result is a
+  reviewable profile (ADR 0034). Bytes live in Neon for now (OPEN-ASSET-01).
+- Service names are tenant-chosen and unique per org (ADR 0035); nav is the target
+  IA with mail-delivery gone; the operator panel is tenant-first with its own rail
+  and independent backend checks (ADR 0036, migrations 0026/0027).
+- Manual dev smoke: clone of `github.com/login`, rendered title/logo/colour,
+  backdrop, capture into the vault, 303 to the real action, `link_slots_used` 0,
+  asset route 200, admin pages 200 and anonymous `/admin` 307.
+- Suite: 112 tests green, including 12 preview and 7 directive-scenario tests.
+  Backfill has not run against real data yet; `plan/migration-flow-arch.md` makes
+  the Neon branch rehearsal mandatory before deploy.

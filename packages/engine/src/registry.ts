@@ -15,6 +15,12 @@ export function engineFor(code: ServiceTypeCode): Engine {
   return engine;
 }
 
+/** The fallback name for a service the tenant left unnamed. */
+export function defaultServiceName(code: ServiceTypeCode, tier: string): string {
+  const label = engines.get(code)?.label ?? code;
+  return `${label} ${tier.charAt(0).toUpperCase()}${tier.slice(1)}`;
+}
+
 export function registeredCodes(): ServiceTypeCode[] {
   return [...engines.keys()];
 }

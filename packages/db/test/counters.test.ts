@@ -32,8 +32,8 @@ describe.skipIf(!hasDb)("slot counters (INV-DATA-04, INV-DATA-05)", () => {
     ).toBe(0);
 
     await admin.query(
-      `insert into links (org_id, service_id, domain_id, slug) values ($1, $2, $3, 'AAAAA')`,
-      [s.orgId, s.serviceId, s.domainId],
+      `insert into links (org_id, service_id, hostname_id, slug) values ($1, $2, $3, 'AAAAA')`,
+      [s.orgId, s.serviceId, s.hostnameId],
     );
     expect(
       (
@@ -77,8 +77,8 @@ describe.skipIf(!hasDb)("slot counters (INV-DATA-04, INV-DATA-05)", () => {
             return false;
           }
           await c.query(
-            `insert into links (org_id, service_id, domain_id, slug) values ($1, $2, $3, $4)`,
-            [s.orgId, s.serviceId, s.domainId, `B${String(i).padStart(4, "0")}`],
+            `insert into links (org_id, service_id, hostname_id, slug) values ($1, $2, $3, $4)`,
+            [s.orgId, s.serviceId, s.hostnameId, `B${String(i).padStart(4, "0")}`],
           );
           await c.query("commit");
           return true;

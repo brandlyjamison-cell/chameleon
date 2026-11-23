@@ -8,6 +8,11 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   suspended: { label: "Suspended", tone: "bad" },
   archived: { label: "Archived", tone: "idle" },
   pending: { label: "Awaiting DNS", tone: "warn" },
+  unverified_email: { label: "Awaiting confirmation", tone: "warn" },
+  routing_waiting: { label: "Routing pending", tone: "warn" },
+  match: { label: "Match", tone: "ok" },
+  mismatch: { label: "Mismatch", tone: "warn" },
+  error: { label: "Resolver error", tone: "warn" },
   verifying: { label: "Verifying", tone: "warn" },
   failed: { label: "Failed", tone: "bad" },
   paused: { label: "Paused", tone: "idle" },
@@ -23,6 +28,9 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   valid: { label: "Valid", tone: "ok" },
   invalid: { label: "Invalid", tone: "bad" },
   verified: { label: "Verified", tone: "ok" },
+  generated: { label: "Needs review", tone: "warn" },
+  accepted: { label: "Accepted", tone: "ok" },
+  rejected: { label: "Rejected", tone: "idle" },
 };
 
 /** Status is data, so the tone map lives in one place. */

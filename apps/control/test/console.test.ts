@@ -23,6 +23,30 @@ async function seedBrand(): Promise<string> {
   return row.rows[0]!.id;
 }
 
+/** An org root plus one hostname under it; returns the hostname id. */
+async function seedHostname(
+  orgId: string,
+  serviceId: string,
+  fqdn: string,
+  status = "active",
+  token = "tok",
+): Promise<{ id: string; verify_token: string }> {
+  const root = fqdn.split(".").slice(-2).join(".");
+  const domain = await admin.query<{ id: string; verify_token: string }>(
+    `insert into org_domains (org_id, root, verify_token, status, verified_at, verified_by)
+     values ($1, $2, $3, 'active', now(), 'txt')
+     on conflict (org_id, root) do update set root = excluded.root returning id, verify_token`,
+    [orgId, root, token],
+  );
+  const row = await admin.query<{ id: string; verify_token: string }>(
+    `insert into hostnames (org_id, domain_id, service_id, fqdn, label, verify_token, status, verified_at)
+     values ($1, $2, $3, $4, $5, $6, $7, case when $7 = 'active' then now() end)
+     returning id, verify_token`,
+    [orgId, domain.rows[0]!.id, serviceId, fqdn, fqdn.split(".")[0], token, status],
+  );
+  return row.rows[0]!;
+}
+
 async function ready() {
   const who = await signUp();
   await verify(who.jar, who.email);
@@ -81,14 +105,11 @@ describe.skipIf(!hasDb)("console", () => {
 
   it("mints a link on an active host and revokes it", async () => {
     const { who, serviceId } = await ready();
-    const domain = await admin.query<{ id: string; verify_token: string }>(
-      "insert into domains (org_id, service_id, hostname, verify_token, status, verified_at) values ($1, $2, 'live.acme.test', 'tok', 'active', now()) returning id, verify_token",
-      [who.orgId, serviceId],
-    );
+    const domain = await seedHostname(who.orgId, serviceId, "live.acme.test");
     const brandId = await seedBrand();
 
     const made = await jsonPost(who.jar, `/api/services/${serviceId}/links`, {
-      domainId: domain.rows[0]!.id,
+      hostnameId: domain.id,
       brandId,
     });
     expect(made.status).toBe(201);
@@ -104,24 +125,27 @@ describe.skipIf(!hasDb)("console", () => {
 
   it("refuses a link on a host that is not active", async () => {
     const { who, serviceId } = await ready();
-    const domain = await admin.query<{ id: string }>(
-      "insert into domains (org_id, service_id, hostname, verify_token) values ($1, $2, 'pending.acme.test', 'tok') returning id",
-      [who.orgId, serviceId],
+    const domain = await seedHostname(
+      who.orgId,
+      serviceId,
+      "pending.acme.test",
+      "provisioning",
     );
     const brandId = await seedBrand();
     const made = await jsonPost(who.jar, `/api/services/${serviceId}/links`, {
-      domainId: domain.rows[0]!.id,
+      hostnameId: domain.id,
       brandId,
     });
     expect(made.status).toBe(409);
-    expect(((await made.json()) as { error: string }).error).toBe("domain_not_active");
+    expect(((await made.json()) as { error: string }).error).toBe("hostname_not_active");
   });
 
-  it("re-checks a failed host instead of 404ing", async () => {
+  it("re-checks a failed domain instead of 404ing", async () => {
     const { who, serviceId } = await ready();
-    const domain = await admin.query<{ id: string; verify_token: string }>(
-      "insert into domains (org_id, service_id, hostname, verify_token, status) values ($1, $2, 'retry.acme.test', 'tok', 'failed') returning id, verify_token",
-      [who.orgId, serviceId],
+    const host = await seedHostname(who.orgId, serviceId, "retry.acme.test", "failed");
+    const domain = await admin.query<{ id: string }>(
+      "select domain_id as id from hostnames where id = $1",
+      [host.id],
     );
     await fetch(
       `${BASE.replace("3100", "3199").replace("localhost", "127.0.0.1")}/_txt`,
@@ -129,8 +153,8 @@ describe.skipIf(!hasDb)("console", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          name: "_chameleon.retry.acme.test",
-          records: [`cameleon-verify=${domain.rows[0]!.verify_token}`],
+          name: "_chameleon.acme.test",
+          records: [`cameleon-verify=${host.verify_token}`],
         }),
       },
     );
@@ -138,10 +162,10 @@ describe.skipIf(!hasDb)("console", () => {
     const checked = await who.jar.post(`/api/domains/${domain.rows[0]!.id}/check`);
     expect(checked.status).toBe(200);
     const row = await admin.query<{ status: string }>(
-      "select status from domains where id = $1",
+      "select status from org_domains where id = $1",
       [domain.rows[0]!.id],
     );
-    expect(["verifying", "active"]).toContain(row.rows[0]?.status);
+    expect(["verifying", "routing_waiting", "active"]).toContain(row.rows[0]?.status);
   });
 
   it("writes an audit row for an operator status change", async () => {
@@ -181,7 +205,6 @@ describe.skipIf(!hasDb)("console", () => {
       "/settings",
       "/settings/domains",
       "/settings/forwarding",
-      "/settings/delivery",
       "/account",
     ]) {
       const res = await who.jar.get(path);

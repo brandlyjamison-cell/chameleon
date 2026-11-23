@@ -1,6 +1,6 @@
 # ADR 0014 — Cloudflare for SaaS for hostnames
 
-Status: accepted (2026-11-20)
+Status: accepted (2026-11-20), amended 2026-11-22 by 0032
 
 ## Context
 
@@ -34,3 +34,12 @@ Medium. Alternate is an ACME pipeline plus a proxy layer; the domain schema alre
 allows a different `tls_ref`.
 
 Last reviewed: 2026-11-20
+
+## Amendment 2026-11-22
+
+The SaaS entitlement is not on the account yet: the zone is Free and
+`/custom_hostnames` returns `1404`. The wildcard `CNAME` is still the tenant's
+one-time setup and is safe to add before routing exists. A root whose TXT is
+proven parks at `routing_waiting`; a capability probe plus the 15-minute reconcile
+promotes it to `active` on the first check after the zone is upgraded, with no
+code change. Preview links (ADR 0033) do not depend on any of this.

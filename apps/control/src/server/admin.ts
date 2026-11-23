@@ -201,3 +201,98 @@ export async function recentAudit(
   );
   return rows;
 }
+
+export interface AdminTenant {
+  orgId: string;
+  orgName: string;
+  ownerEmail: string | null;
+  createdAt: Date;
+  services: number;
+  captures: number;
+  domains: number;
+  hostnames: number;
+  lastSeen: Date;
+}
+
+/** Tenant-first search: name, owner address or exact id. */
+export async function searchTenants(
+  session: PlatformSession,
+  q: string,
+): Promise<AdminTenant[]> {
+  assertAdmin(session);
+  const { rows } = await requireDb().pool.query<AdminTenant>(
+    `select org_id as "orgId", org_name as "orgName", owner_email as "ownerEmail",
+            created_at as "createdAt", services, captures, domains, hostnames,
+            last_seen as "lastSeen"
+       from admin_tenants($1)`,
+    [q.trim() || null],
+  );
+  return rows;
+}
+
+export interface AdminTenantService {
+  id: string;
+  name: string;
+  status: string;
+  tier: string;
+  previewKey: string;
+  linkCap: number;
+  hostnameCap: number;
+  linksUsed: number;
+  hostnamesUsed: number;
+  paidUntil: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminTenantDomain {
+  id: string;
+  root: string;
+  status: string;
+  routingState: string;
+  createdAt: string;
+}
+
+export interface AdminTenantHostname {
+  id: string;
+  fqdn: string;
+  status: string;
+  serviceName: string;
+  createdAt: string;
+}
+
+export interface AdminTenantForward {
+  id: string;
+  email: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface AdminTenantDetail {
+  org: {
+    id: string;
+    name: string;
+    createdAt: string;
+    notifyEmail: string | null;
+    notifyEnabled: boolean;
+    notifyVerifiedAt: string | null;
+  };
+  owner: string | null;
+  services: AdminTenantService[];
+  domains: AdminTenantDomain[];
+  hostnames: AdminTenantHostname[];
+  forwards: AdminTenantForward[];
+  audit: AuditRow[];
+}
+
+export async function tenantDetail(
+  session: PlatformSession,
+  orgId: string,
+): Promise<AdminTenantDetail | null> {
+  assertAdmin(session);
+  const { rows } = await requireDb().pool.query<{ detail: AdminTenantDetail }>(
+    "select admin_org_detail($1) as detail",
+    [orgId],
+  );
+  return rows[0]?.detail ?? null;
+}

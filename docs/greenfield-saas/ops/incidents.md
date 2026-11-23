@@ -92,3 +92,49 @@ owner is deleted.
 - No incident channel cleanup until the postmortem is merged.
 
 Last reviewed: 2026-11-20
+
+## INC-01 — control host dark (S1, open) — 2026-11-22 20:31Z
+
+**Status:** open. Declared 2026-11-23 13:15Z by the incoming CTO after the fact;
+the outage ran undetected for ~17 h because nothing pages on 522.
+
+**Timeline (UTC, from Cloudflare edge logs and the workstation shell history):**
+
+```
+2026-11-22 20:24  last file write on the workstation (a scratch query helper, now
+                  `scripts/query-prod.mjs`); no deploy running
+2026-11-22 20:29  last assistant action in the build session
+2026-11-22 20:31  first 522 on app.mailerdeaon.bid — origin unreachable
+2026-11-22 20:40  Neon autosuspends the prod compute (no more connections)
+2026-11-23 13:00  check-host.net from 8 countries: 522 on app/go/assets, all ~19.7 s
+2026-11-23 13:06  /api/health unreachable; 25/22/23/25/443/80/587/465 all time out
+2026-11-23 13:13  Cloudflare GraphQL: every status since 20:31 is 522; the only
+                 200s are the 522 page's own /cdn-cgi assets
+```
+
+**Shape:** total loss of the VPS `65.98.5.195` (Verpex). Not an app error: ICMP,
+SSH and every TCP port are dead from three independent networks, `assets.` and
+`go.` are dead with `app.`, and the reverse DNS is a stranger's domain. The
+control app cannot produce 522 on its own — 522 is Cloudflare failing to open
+the TCP connection.
+
+**What is safe:** Postgres is Neon, not the box. Production branch
+`br-rough-glitter-bdto85ft` is healthy: 15 users, 15 orgs, 8 services, 3 links,
+3 captures, 0 queued mail; schema at 0024 (the destructive 0025-0027 have **not**
+run in prod). `/etc/chameleon/env` is rebuilt by `scripts/deploy.mjs`, so a
+rebuilt host needs no secret restore — only the deploy public key.
+
+**What is lost:** the release in `/srv/chameleon` and the journal. Nothing else
+was on the box; the deploy is from git.
+
+**Bleeding stopped?** No. Needs the Verpex client area (`clients.verpex.com`) to
+see whether the VPS is stopped, suspended, or on a failed node, and to
+reboot/console/reinstall.
+
+**Recovery path:** panel → power/console. If the node or disk is gone, reinstall
+Ubuntu 24.04 at the same IP, add `chameleon_deploy.pub`, run `ops/provision.sh`,
+`node scripts/deploy.mjs`.
+
+**Detection gap:** `chameleon-mail.timer`/`domains.timer` only run on the box, so
+a dark box takes its own alarms with it. Action: external uptime probe on
+`/api/health` (both planes), owned before this incident closes.

@@ -58,7 +58,7 @@ export async function asTenant<T>(
 
 export class CapError extends Error {
   readonly status = 409;
-  constructor(readonly slot: "link" | "domain") {
+  constructor(readonly slot: "link" | "hostname") {
     super(`${slot}_slots_exhausted`);
   }
 }

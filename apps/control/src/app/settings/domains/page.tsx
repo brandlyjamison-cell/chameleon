@@ -1,38 +1,42 @@
 import { redirect } from "next/navigation";
 import { requirePageSession } from "../../../server/session";
-import {
-  listOrgDomains,
-  removeDomain,
-  requestDomain,
-  routingTarget,
-} from "../../../server/domains";
-import { listServices } from "../../../server/services";
-import { DnsRecords } from "../../../components/dns-record";
+import { listOrgDomains, removeDomain, requestDomain } from "../../../server/domains";
 import { ConfirmSubmit } from "../../../components/shell";
-import { Empty, PageHeader } from "../../../components/ui";
+import { Empty, PageHeader, StatusPill, shortDate } from "../../../components/ui";
 
 function codeOf(error: unknown): string {
   return (error as { code?: string }).code ?? "not_found";
 }
 
-export default async function DomainsPage() {
+const errors: Record<string, string> = {
+  bad_domain: "That is not a domain. Enter a root such as example.com.",
+  use_root_domain:
+    "Enter the root domain, not a subdomain: example.com, not login.example.com.",
+  domain_exists: "That domain is already on the account.",
+  domain_tombstoned:
+    "Another account held that domain recently. It returns after 30 days.",
+  zone_full: "The platform is at its live-domain ceiling. Try again shortly.",
+};
+
+export default async function DomainsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; added?: string }>;
+}) {
   const session = await requirePageSession();
-  const [domains, services] = await Promise.all([
-    listOrgDomains(session),
-    listServices(session),
-  ]);
-  const active = services.filter((service) => service.status === "active");
+  const domains = await listOrgDomains(session);
+  const params = await searchParams;
 
   async function add(formData: FormData) {
     "use server";
     const ctx = await requirePageSession();
-    const serviceId = String(formData.get("serviceId") ?? "");
+    let id: string;
     try {
-      await requestDomain(ctx, serviceId, String(formData.get("hostname") ?? ""));
+      id = (await requestDomain(ctx, String(formData.get("root") ?? ""))).id;
     } catch (error) {
       redirect(`/settings/domains?error=${codeOf(error)}`);
     }
-    redirect("/settings/domains?added=1");
+    redirect(`/settings/domains/${id}?added=1`);
   }
 
   async function remove(formData: FormData) {
@@ -46,109 +50,86 @@ export default async function DomainsPage() {
     redirect("/settings/domains?removed=1");
   }
 
-  const grouped = new Map<string, typeof domains>();
-  for (const domain of domains) {
-    const list = grouped.get(domain.serviceType) ?? [];
-    list.push(domain);
-    grouped.set(domain.serviceType, list);
-  }
-
   return (
     <main className="app" id="content">
       <PageHeader
         crumbs={[{ href: "/settings", label: "Configuration" }, { label: "Domains" }]}
         title="Domains"
-        lede={`Every hostname the platform answers for. Point routing at ${routingTarget()} after the ownership record is proven.`}
+        lede="Owned by the account, not by one service. Verify a domain once, then create as many hostnames under it as your plans allow."
       />
-      {active.length > 0 ? (
+
+      {params.error ? (
+        <p className="error" role="alert">
+          {errors[params.error] ?? "That did not work."}
+        </p>
+      ) : null}
+      {params.added ? (
         <p className="note info">
-          Add hostnames per service. A hostname attached to one service never answers for
-          another.
+          Domain added. Publish the ownership record, then check.
         </p>
       ) : null}
 
+      <form action={add} className="card" style={{ marginBottom: "1.1rem" }}>
+        <div className="field-row">
+          <div className="field grow">
+            <label htmlFor="root">Add a domain</label>
+            <input
+              id="root"
+              name="root"
+              required
+              placeholder="example.com"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <p className="fine">
+              The root only. Subdomains such as <code>portal.example.com</code> are
+              hostnames and come later.
+            </p>
+          </div>
+          <button type="submit" className="btn">
+            Add domain
+          </button>
+        </div>
+      </form>
+
       {domains.length === 0 ? (
-        <Empty title="No hostnames yet">
-          Add one below once a service is activated. Nothing resolves until both records
-          are published and checked.
+        <Empty title="No domains yet">
+          A domain is verified once and then shared by every eligible service on the
+          account. Nothing resolves until it is verified.
         </Empty>
       ) : (
-        <div className="stack">
-          {[...grouped.entries()].map(([type, list]) => (
-            <section key={type}>
-              <h2>{type}</h2>
-              {list.map((domain) => (
-                <div className="card" key={domain.id}>
-                  <div className="row" style={{ marginBottom: "0.7rem" }}>
-                    <div>
-                      <strong className="mono">{domain.hostname}</strong>
-                      <div className="fine">
-                        <a href={`/services/${domain.serviceId}#domains`}>Open service</a>
-                      </div>
-                    </div>
-                  </div>
-                  <DnsRecords
-                    domain={domain}
-                    serviceId={domain.serviceId}
-                    returnTo="/settings/domains"
-                  />
-                  <div className="actions" style={{ marginTop: "0.8rem" }}>
-                    <form action={remove}>
-                      <input type="hidden" name="domainId" value={domain.id} />
-                      <ConfirmSubmit
-                        message={`Delete ${domain.hostname}? Links on it stop resolving and the name is tombstoned for 30 days.`}
-                      >
-                        Delete
-                      </ConfirmSubmit>
-                    </form>
-                  </div>
-                </div>
-              ))}
-            </section>
+        <div className="table">
+          {domains.map((domain) => (
+            <div className="tr" key={domain.id}>
+              <a href={`/settings/domains/${domain.id}`}>
+                <strong>{domain.root}</strong>
+                {domain.reviewNeeded ? (
+                  <span className="muted"> · check the root</span>
+                ) : null}
+              </a>
+              <StatusPill status={domain.status} />
+              <span className="muted">
+                {domain.hostnameCount} hostname{domain.hostnameCount === 1 ? "" : "s"}
+              </span>
+              <span className="muted">added {shortDate(domain.checkedAt ?? "")}</span>
+              <div className="actions">
+                <a className="btn ghost sm" href={`/settings/domains/${domain.id}`}>
+                  Open
+                </a>
+                <form action={remove}>
+                  <input type="hidden" name="domainId" value={domain.id} />
+                  <ConfirmSubmit
+                    className="btn ghost sm"
+                    message={`Remove ${domain.root}? Its hostnames stop answering and the domain is held for 30 days.`}
+                  >
+                    Remove
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            </div>
           ))}
         </div>
       )}
-
-      <section className="section">
-        <h2>Add a hostname</h2>
-        {active.length === 0 ? (
-          <p className="muted">
-            Activation comes first. <a href="/services">Open a service</a> and activate
-            it.
-          </p>
-        ) : (
-          <form action={add} className="card">
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="serviceId">Service</label>
-                <select id="serviceId" name="serviceId" required>
-                  {active.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.serviceType} · {service.tier}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="hostname">Hostname</label>
-                <input
-                  id="hostname"
-                  name="hostname"
-                  placeholder="login.acme.com"
-                  required
-                />
-              </div>
-            </div>
-            <p className="fine">
-              No scheme, no path. Use a subdomain unless your provider supports CNAME at
-              the apex.
-            </p>
-            <button type="submit" className="btn">
-              Add hostname
-            </button>
-          </form>
-        )}
-      </section>
     </main>
   );
 }

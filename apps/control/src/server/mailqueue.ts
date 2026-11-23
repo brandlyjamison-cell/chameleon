@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { asTenant, requireDb } from "./db";
 import type { Ctx } from "@chameleon/db";
-import { sendMail } from "./mail";
+import { mailLimits, sendMail, type MailLimits } from "./mail";
 
 export type MailKind =
   "verify" | "invoice" | "receipt" | "forward" | "warning" | "system";
@@ -20,6 +20,17 @@ export interface DrainResult {
   sent: number;
   failed: number;
   throttled: number;
+  /** True when the daily quota is spent and no row was claimed at all. */
+  parked: boolean;
+}
+
+/** Inside this window before a reset, claiming is pointless: hold the batch. */
+const PARK_MARGIN_MS = 60_000;
+
+export function quotaSpent(limits: MailLimits | null): boolean {
+  if (!limits?.overQuota) return false;
+  if (!limits.resetsAt) return true;
+  return limits.resetsAt.getTime() - Date.now() > -PARK_MARGIN_MS;
 }
 
 interface QueuedRow {
@@ -67,7 +78,14 @@ export async function enqueueEmail(mail: Outgoing): Promise<boolean> {
 }
 
 /** Sends whatever is due. Backoff and the 6-try ceiling live in `finish_email`. */
-export async function drain(limit = 20): Promise<DrainResult> {
+export async function drain(limit = 20, force = false): Promise<DrainResult> {
+  const limits = await mailLimits();
+  if (!force && quotaSpent(limits)) {
+    const stats = await mailStats().catch(() => null);
+    if (stats) warnIfStale(stats, limits);
+    return { sent: 0, failed: 0, throttled: 0, parked: true };
+  }
+
   const { rows } = await requireDb().pool.query<QueuedRow>(
     "select * from claim_emails($1)",
     [limit],
@@ -111,9 +129,9 @@ export async function drain(limit = 20): Promise<DrainResult> {
       break;
     }
   }
-  const result = { sent, failed, throttled };
+  const result = { sent, failed, throttled, parked: false };
   await mailStats()
-    .then(warnIfStale)
+    .then((stats) => warnIfStale(stats, limits))
     .catch(() => undefined);
   return result;
 }
@@ -171,10 +189,11 @@ export async function mailStats(): Promise<MailStats> {
 
 /**
  * A backlog older than five minutes means the drain itself is broken, not that
- * one recipient is throttled. Logged so it shows up in `journalctl` without a
- * separate agent.
+ * one recipient is throttled. While the daily quota is spent the backlog is
+ * expected, so it only counts once the queue stops being parked.
  */
-export function warnIfStale(stats: MailStats): void {
+export function warnIfStale(stats: MailStats, limits?: MailLimits | null): void {
+  if (quotaSpent(limits ?? null)) return;
   if (stats.oldestQueuedSeconds > 300) {
     console.warn(
       `[mail] backlog ${stats.queued} queued, oldest ${stats.oldestQueuedSeconds}s — drain may be stuck`,
