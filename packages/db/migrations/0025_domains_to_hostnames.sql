@@ -97,7 +97,11 @@ alter table domains rename to hostnames;
 alter table hostnames rename column hostname to fqdn;
 alter table hostnames add column domain_id uuid references org_domains (id) on delete cascade;
 alter table hostnames add column label text not null default '';
+-- RLS is forced on the table, so a data update as the migrator (no app.org_id)
+-- matches zero rows. Every row-level statement below runs as app_admin.
+set role app_admin;
 update hostnames set label = split_part(fqdn, '.', 1);
+reset role;
 alter table hostnames alter column label drop default;
 alter table hostnames alter column verify_token drop not null;
 
@@ -118,9 +122,12 @@ create unique index hostnames_fqdn_live on hostnames (lower(fqdn)) where deleted
 create index hostnames_fqdn_tombstones on hostnames (lower(fqdn)) where deleted_at is not null;
 create index hostnames_org on hostnames (org_id, created_at desc);
 
+-- The old check does not allow the new state names, so it goes before the map.
+alter table hostnames drop constraint if exists domains_status_check;
+set role app_admin;
 update hostnames set status = case status
   when 'pending' then 'provisioning' when 'verifying' then 'waiting' else status end;
-alter table hostnames drop constraint if exists domains_status_check;
+reset role;
 alter table hostnames add constraint hostnames_status_check
   check (status in ('provisioning', 'waiting', 'active', 'paused', 'failed'));
 

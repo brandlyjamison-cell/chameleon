@@ -1,6 +1,6 @@
 # ADR 0025 — Domain verification: DoH, SECURITY DEFINER lookups, and no quota
 
-Status: accepted (2026-11-21)
+Status: accepted (2026-11-21), refined 2026-11-22 by 0032
 
 ## Context
 
@@ -58,3 +58,10 @@ Low for DoH and the route; the functions are migration 0008 and can be dropped
 once custom hostnames live in a table the job owns.
 
 Last reviewed: 2026-11-21
+
+## Refinement 2026-11-22
+
+The verified object is now the org's root domain, not an individual hostname
+(ADR 0032). The TXT lives at `_chameleon.<root>` and proves the whole root once;
+hostnames under it carry no token. The tombstone, 72-hour expiry and
+`assert_domain_verified` trigger all move with it.

@@ -43,3 +43,8 @@ Index:
 | 0031 | Operator surfaces: flag plus definer, not a role      | accepted |
 
 Last reviewed: 2026-11-22
+| 0032 | Domains belong to the org, hostnames to the service | accepted |
+| 0033 | A free preview link lives on a platform path | accepted |
+| 0034 | Clones are reviewable profiles with a fixed order | accepted |
+| 0035 | Service names are tenant-chosen, unique per org | accepted |
+| 0036 | The operator panel is tenant-first with its own rail | accepted |
